@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 # License: Apache 2.0. See LICENSE file in root directory.
 ## Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
@@ -48,6 +51,11 @@ class realSenseCamera:
         self.align = rs.align(align_to)
         print("[+] realsense {} initialization \n".format(device_product_line))
 
+    def __del__(self):
+        self.pipeline.stop()
+        print("[+] realsense terminated")
+
+
     def getAlignedFrames(self):
         # Get frameset of color and depth
         frames = self.pipeline.wait_for_frames()
@@ -96,9 +104,8 @@ class realSenseCamera:
         return rs.rs2_deproject_pixel_to_point(depth_intrinsics, [x, y], depth)  
     
     def stream(self):
-        # Streaming loop
-        try:
-            while True:                
+        # Streaming loop        
+        while True:                
                 aligned_depth_frame, aligned_color_frame = self.getAlignedFrames()
 
                 # Validate that both frames are valid
@@ -130,9 +137,7 @@ class realSenseCamera:
                 # Press esc or 'q' to close the image window
                 if key & 0xFF == ord('q') or key == 27:
                     cv2.destroyAllWindows()
-                    break
-        finally:
-            self.pipeline.stop()
+                    break            
 
 
 if __name__ == "__main__":

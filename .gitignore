@@ -1,0 +1,10 @@
+# ros build files
+build
+devel
+
+#python
+src/__pycache__/
+
+# other
+.vscode
+.catkin_workspace

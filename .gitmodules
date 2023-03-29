@@ -1,3 +1,0 @@
-[submodule "src/robot_arm/tools/xArm-Python-SDK"]
-	path = src/robot_arm/tools/xArm-Python-SDK
-	url = https://github.com/xArm-Developer/xArm-Python-SDK.git

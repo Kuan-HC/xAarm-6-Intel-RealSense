@@ -6,7 +6,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 
-from realsense import realSenseCamera
+from tools.realsense import realSenseCamera
 
 if __name__ == "__main__":
     cam = realSenseCamera()

@@ -1,6 +1,7 @@
 # ros build files
 build
-devel
+install
+log
 
 #python
 src/__pycache__/

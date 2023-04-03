@@ -20,21 +20,31 @@ import cv2
 from enum import Enum
  
 class state(Enum):
-    INITIAL_POS = 0
-    DEFAULT_POS = 1
+    SLEEP_MODE = 0
+    MOVE_POS = 1
+    DEFAULT_CHARGE_POS = 2
 
 
 class armControl:
     def __init__(self):
         #intel realsense camera
         #self.cam = realSenseCamera()
-
+        
         #connect xarm6 
-        self.arm = XArmAPI('192.168.1.218')
+        self.arm = XArmAPI('192.168.1.221')  # AC power supply IP
         self.arm.motion_enable(enable=True)
         self.arm.set_mode(0)
         self.arm.set_state(state=0)
-        
+        self.arm.set_self_collision_detection(1)
+        self.arm.reset(speed=15, wait=True)   
+
+        # state machine states
+        self.state_machine = [True, False, False]        
+
+        #parameter get from ros
+        self.action = True   #system get new charging mission, set this parameter to true, arm change position from sleep to move pose
+        self.mobile_on_spot = True
+           
         
 
     def cameraTest(self):
@@ -60,26 +70,36 @@ class armControl:
                 break
 
     def run(self):
-        armState = state.INITIAL_POS
-        armInitialized = False
+        armState = state.SLEEP_MODE  
+        angleSpeed = 20  # degree/s  
+        lineSpeed = 50 # mm/s  
         
 
         # state changes
         while True:
-            if armState == state.INITIAL_POS:
-                if armInitialized == True:
-                    armState = state.DEFAULT_POS
-
+            if armState == state.SLEEP_MODE:
+                if self.state_machine[0] == True and self.action == True:
+                    armState = state.MOVE_POS
+            elif armState == state.MOVE_POS:
+                if self.state_machine[1] == True and self.mobile_on_spot == True:
+                    armState = state.DEFAULT_CHARGE_POS
 
 
             # state action
-            if armState == state.INITIAL_POS:
-                if armInitialized == False:
-                    self.arm.reset(wait=True)
-                    armInitialized = True
-                    print("[+] Xarm initialized")
-            
-            print("[+] arm state:{}".format(armState))
+            if armState == state.MOVE_POS and self.state_machine[1] == False:
+                self.arm.set_servo_angle(angle=[30, -45, 0, 0, 45, 0], speed=angleSpeed, wait=True)    
+                self.state_machine[1] = True     
+            elif armState == state.DEFAULT_CHARGE_POS and self.state_machine[2] == False:           
+                self.arm.set_servo_angle(angle=[0, 0, 0, 0, -90, 0], relative = True, speed=angleSpeed, wait=True)
+                print(self.arm.get_position())
+                self.arm.set_tool_position(z=50, speed=lineSpeed, is_radian=False, wait=True)
+                print(self.arm.get_position())
+                
+                self.state_machine[2] = True
+                    
+            #self.arm.set_tool_position(roll = 10, speed=angleSpeed, is_radian=False, wait=True) # for future use 
+
+            #print("[+] arm state:{}".format(armState))
 
 
 if __name__ == "__main__":

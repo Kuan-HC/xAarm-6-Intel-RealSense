@@ -20,7 +20,7 @@ import cv2
 from enum import Enum
  
 class state(Enum):
-    SLEEP_MODE = 0
+    STANDBY = 0
     MOVE_POS = 1
     DEFAULT_CHARGE_POS = 2
 
@@ -70,14 +70,13 @@ class armControl:
                 break
 
     def run(self):
-        armState = state.SLEEP_MODE  
+        armState = state.STANDBY  
         angleSpeed = 20  # degree/s  
         lineSpeed = 50 # mm/s  
         
-
-        # state changes
         while True:
-            if armState == state.SLEEP_MODE:
+            # state changes
+            if armState == state.STANDBY:
                 if self.state_machine[0] == True and self.action == True:
                     armState = state.MOVE_POS
             elif armState == state.MOVE_POS:

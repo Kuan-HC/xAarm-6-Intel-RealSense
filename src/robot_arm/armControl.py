@@ -39,7 +39,7 @@ class armControl:
         self.arm.reset(speed=15, wait=True)   
 
         # state machine states
-        self.state_machine = [True, False, False]        
+        self.state_machine = [False, False, False]        
 
         #parameter get from ros
         self.action = True   #system get new charging mission, set this parameter to true, arm change position from sleep to move pose
@@ -79,13 +79,18 @@ class armControl:
             if armState == state.STANDBY:
                 if self.state_machine[0] == True and self.action == True:
                     armState = state.MOVE_POS
+                    self.state_machine[0] = False
             elif armState == state.MOVE_POS:
                 if self.state_machine[1] == True and self.mobile_on_spot == True:
                     armState = state.DEFAULT_CHARGE_POS
+                    self.state_machine[1] == False
 
 
             # state action
-            if armState == state.MOVE_POS and self.state_machine[1] == False:
+            if armState == state.STANDBY and self.state_machine[0] == False:
+                self.arm.reset(speed=angleSpeed, wait=True)
+                self.state_machine[0] == True
+            elif armState == state.MOVE_POS and self.state_machine[1] == False:
                 self.arm.set_servo_angle(angle=[30, -45, 0, 0, 45, 0], speed=angleSpeed, wait=True)    
                 self.state_machine[1] = True     
             elif armState == state.DEFAULT_CHARGE_POS and self.state_machine[2] == False:           

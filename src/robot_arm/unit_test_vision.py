@@ -14,7 +14,6 @@ if __name__ == "__main__":
     track = qrCodeDetect()
     track.setRefImg(imgId = 0)
 
-    print("set finish")
     while True:
         try:
             rgbImage = cam.getColorImage()   

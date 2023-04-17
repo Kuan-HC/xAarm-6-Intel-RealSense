@@ -5,6 +5,7 @@ log
 
 #python
 src/__pycache__/
+src/robot_arm/tools/__pycache__/
 
 # other
 .vscode

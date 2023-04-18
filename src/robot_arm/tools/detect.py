@@ -21,9 +21,8 @@ class qrCodeDetect:
     
     def setRefImg(self, imgId = 0):
         imgPath = "./ref_images/" + str(imgId) + ".jpg" 
-        print(imgPath)
         refImg = cv2.imread(imgPath, cv2.IMREAD_GRAYSCALE) 
-        self.refImg = self.re_size_photo(refImg, 10)      
+        self.refImg = self.re_size_photo(refImg, 5)      
 
 
     def findQRcode(self,rgbImage):
@@ -44,7 +43,7 @@ class qrCodeDetect:
             if m.distance < 0.73 * n.distance:
                 good_points.append(m)
         
-        drawMatches = False
+        drawMatches = True
         if drawMatches == True:
             img3 = cv2.drawMatches(self.refImg, kp_image, rgbImage, kp_grayframe, good_points, rgbImage,
                                flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -54,7 +53,7 @@ class qrCodeDetect:
             cv2.waitKey(1)  
 
 
-        if len(good_points) > 15:
+        if len(good_points) > 50:
             query_pts = np.float32([kp_image[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
             train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
 

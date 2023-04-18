@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 
 from tools.realsense import realSenseCamera
-from tools.tracking import qrCodeDetect
+from tools.detect import qrCodeDetect
 
 if __name__ == "__main__":
     cam = realSenseCamera()
@@ -28,7 +28,10 @@ if __name__ == "__main__":
             
             cv2.imshow('Rgb image, ESC to quit', rgbImage)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            key = cv2.waitKey(1)    
+    
+            if key & 0xFF == ord('q') or key == 27:
+                cv2.destroyAllWindows()
                 break
 
         except Exception as e:

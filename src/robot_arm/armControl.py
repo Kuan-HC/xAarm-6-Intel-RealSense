@@ -45,11 +45,11 @@ class camera_thread(threading.Thread):
         # paramaters
         self.isVisual = isVisual
         self.activeDetect = False
+        self.offset = 0
 
         # retur values
-        self.qrCodeX = .0
-        self.centerY = .0
-        self.centerZ = .0
+        self.qrCodeX = None
+        self.qrCodeY = None
 
         # create a image, this will be used for QR code detection
         #self.frame = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -60,8 +60,11 @@ class camera_thread(threading.Thread):
     def set_detect_ref_img(self, id):
         self.detect.setRefImg(imgId = id)
 
-    def get_centerXYZ(self):
-        return self.centerX, self.centerY, self.centerZ    
+    def set_offset(self, num):
+        self.offset = int(num)
+
+    def get_qrCenter(self):
+        return self.qrCodeX, self.qrCodeY   
     
     def run(self):
         if self.isVisual == True:
@@ -71,14 +74,13 @@ class camera_thread(threading.Thread):
             frame = self.cam.getColorImage()
             
             if self.activeDetect == True:
-                X, Y, = self.detect.findQRcode(frame)
-                if X != None and Y != None:  
-                    cv2.circle(frame, (X, Y), 3, (0, 0, 255), -1)
-                    cv2.circle(frame, (X + 50, Y), 3, (255, 0, 0), -1)
-                    cv2.circle(frame, (X - 50, Y), 3, (255, 0, 0), -1)
-                    thread_lock.acquire()
-                    self.centerX, self.centerY, self.centerZ = self.cam.getCoordinate(X,Y)    
-                    thread_lock.release()                        
+                thread_lock.acquire()
+                self.qrCodeX, self.qrCodeY, = self.detect.findQRcode(frame)
+                thread_lock.release() 
+                if self.qrCodeX != None and self.qrCodeY != None:  
+                    cv2.circle(frame, (self.qrCodeX, self.qrCodeY), 3, (0, 0, 255), -1)
+                    cv2.circle(frame, (self.qrCodeX + self.offset, self.qrCodeY), 3, (255, 0, 0), -1)
+                    cv2.circle(frame, (self.qrCodeX - self.offset, self.qrCodeY), 3, (255, 0, 0), -1)                      
             
             if self.isVisual == True:
                 cv2.imshow('Vision', frame)
@@ -86,7 +88,7 @@ class camera_thread(threading.Thread):
             
 
 class armControl:
-    def __init__(self, isVisual = True):
+    def __init__(self, isVisual = True, offset = 50):
         #camera thread
         self.camThread = camera_thread(isVisual)
         
@@ -104,7 +106,10 @@ class armControl:
         self.action = True   #system get new charging mission, set this parameter to true, arm change position from sleep to move pose
         self.mobile_on_spot = True
         self.qrCodeId = 0
-           
+
+        #parameter for target QR code
+        self.offset = offset
+        
 
     def run(self):
         # start camera threading
@@ -129,6 +134,7 @@ class armControl:
                 if self.state_machine[2] == True:
                     self.camThread.set_detect_ref_img(self.qrCodeId)
                     self.camThread.set_detect(True)
+                    self.camThread.set_offset(self.offset)
                     armState = state.SEARCH_QR_CODE                  
 
             # state action
@@ -151,10 +157,13 @@ class armControl:
                 '''
                 use while loop to make sure get something
                 '''
-                xw, yw, zw = self.camThread.get_centerXYZ()
-                while zw - 0.0 < 1E-6 and zw - 0.0 > -1E-6:
-                    xw, yw, zw = self.camThread.get_centerXYZ()
-                print("[+] qrCodeCenter: {}, {}, {}".format(xw, yw, zw))                   
+                qrX, qrY = self.camThread.get_qrCenter()
+                while qrX == None or qrY == None:
+                    qrX, qrY = self.camThread.get_qrCenter()
+
+                centWcoord = self.camThread.cam.getCoordinate(qrX, qrY)
+                
+                print("[+] qrCodeCenter: {}, {}, {}".format(centWcoord[0], centWcoord[1], centWcoord[2]))                   
                                    
                             
                 # if X != None and Y != None:
@@ -182,5 +191,5 @@ class armControl:
         self.camThread.join()
 
 if __name__ == "__main__":
-    xarm6 = armControl(isVisual = True)
+    xarm6 = armControl(isVisual = True, offset = 50)
     xarm6.run()

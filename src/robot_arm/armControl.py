@@ -40,36 +40,55 @@ class camera_thread(threading.Thread):
     def __init__(self, isVisual):
         super(camera_thread, self).__init__()
         
-        self.cam = realSenseCamera()
+        self.cam = realSenseCamera()  #Intel realsense camera
+        self.detect = qrCodeDetect()  #QR code detector
+        # paramaters
         self.isVisual = isVisual
+        self.activeDetect = False
+
+        # retur values
+        self.qrCodeX = .0
+        self.centerY = .0
+        self.centerZ = .0
+
         # create a image, this will be used for QR code detection
-        self.frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        #self.frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    
+    def set_detect(self, on_off):
+        self.activeDetect = on_off
 
-    def get_frame(self):
-        return self.frame
+    def set_detect_ref_img(self, id):
+        self.detect.setRefImg(imgId = id)
 
+    def get_centerXYZ(self):
+        return self.centerX, self.centerY, self.centerZ    
+    
     def run(self):
         if self.isVisual == True:
             cv2.namedWindow('Vision', cv2.WINDOW_NORMAL)
 
-        while True:
-            thread_lock.acquire()
-            self.frame = self.cam.getColorImage()
-            thread_lock.release()
+        while True:           
+            frame = self.cam.getColorImage()
+            
+            if self.activeDetect == True:
+                X, Y, = self.detect.findQRcode(frame)
+                if X != None and Y != None:  
+                    cv2.circle(frame, (X, Y), 3, (0, 0, 255), -1)
+                    cv2.circle(frame, (X + 50, Y), 3, (255, 0, 0), -1)
+                    cv2.circle(frame, (X - 50, Y), 3, (255, 0, 0), -1)
+                    thread_lock.acquire()
+                    self.centerX, self.centerY, self.centerZ = self.cam.getCoordinate(X,Y)    
+                    thread_lock.release()                        
             
             if self.isVisual == True:
-                cv2.imshow('Vision', self.frame)
+                cv2.imshow('Vision', frame)
                 cv2.waitKey(1)
             
-
 
 class armControl:
     def __init__(self, isVisual = True):
         #camera thread
         self.camThread = camera_thread(isVisual)
-        
-        #QR code detector
-        self.detect = qrCodeDetect()
         
         #connect xarm6 
         self.arm = XArmAPI('192.168.1.221')  # AC power supply IP
@@ -97,9 +116,6 @@ class armControl:
         lineSpeed = 40 # mm/s  
 
         while True:
-            # get image
-            #image = self.cam.getColorImage()  
-
             # state changes
             if armState == state.INITIALIZE:
                 if self.state_machine[0] == True and self.action == True:
@@ -111,10 +127,9 @@ class armControl:
 
             elif armState == state.DEFAULT_CHARGE_POS:
                 if self.state_machine[2] == True:
-                    self.detect.setRefImg(imgId = self.qrCodeId) 
-                    armState = state.SEARCH_QR_CODE
-                    cv2.namedWindow('QR Code Detect', cv2.WINDOW_NORMAL)                    
-
+                    self.camThread.set_detect_ref_img(self.qrCodeId)
+                    self.camThread.set_detect(True)
+                    armState = state.SEARCH_QR_CODE                  
 
             # state action
             if armState == state.INITIALIZE and self.state_machine[0] == False:
@@ -133,26 +148,33 @@ class armControl:
                 self.state_machine[2] = True
 
             elif armState == state.SEARCH_QR_CODE and self.state_machine[3] == False:
-                
-                copyFrame = deepcopy(self.camThread.get_frame())
-                X, Y, = self.detect.findQRcode(copyFrame)  
+                '''
+                use while loop to make sure get something
+                '''
+                xw, yw, zw = self.camThread.get_centerXYZ()
+                while zw - 0.0 < 1E-6 and zw - 0.0 > -1E-6:
+                    xw, yw, zw = self.camThread.get_centerXYZ()
+                print("[+] qrCodeCenter: {}, {}, {}".format(xw, yw, zw))                   
+                                   
                             
-                if X != None and Y != None:
-                    xw, yw, zw = self.camThread.cam.getCoordinate(X, Y)  
-                    xw *= 1000  # transfer to mm
-                    yw *= 1000
-                    if abs(xw) > 1:
-                        print("[+] Targeting QR Code: tool coordinate y:{}".format(int(xw)))
-                        self.arm.set_tool_position(y = int(xw), speed=5, is_radian=False, wait=True)
+                # if X != None and Y != None:
+                #     xw, yw, zw = self.camThread.cam.getCoordinate(X, Y)  
+                #     xw *= 1000  # transfer to mm
+                #     yw *= 1000
+                #     if abs(xw) > 1:
+                #         print("[+] Targeting QR Code: tool coordinate y:{}".format(int(xw)))
+                #         self.arm.set_tool_position(y = int(xw), speed=10, is_radian=False, wait=True)
 
 
-                    print("[+] x:{}, y:{}, armPosition:{}".format(xw,yw, self.arm.get_position()))
-                    cv2.circle(copyFrame, (X, Y), 3, (0, 0, 255), -1)
+                #     print("[+] x:{}, y:{}, armPosition:{}".format(xw,yw, self.arm.get_position()))
+                #     cv2.circle(copyFrame, (X, Y), 3, (0, 0, 255), -1)
 
-                cv2.imshow('QR Code Detect', copyFrame)
-                cv2.waitKey(1)                   
+                # cv2.imshow('QR Code Detect', copyFrame)
+                # cv2.waitKey(1)     
+
+                self.state_machine[3] = True              
             
-            print("[+] state: {}".format(armState))
+            #print("[+] state: {}".format(armState))
                     
             #self.arm.set_tool_position(roll = 10, speed=angleSpeed, is_radian=False, wait=True) # for future use 
         
@@ -160,5 +182,5 @@ class armControl:
         self.camThread.join()
 
 if __name__ == "__main__":
-    xarm6 = armControl(isVisual = False)
+    xarm6 = armControl(isVisual = True)
     xarm6.run()

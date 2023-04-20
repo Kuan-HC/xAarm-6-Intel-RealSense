@@ -112,6 +112,18 @@ class armControl:
 
         #parameter for target QR code
         self.offset = offset
+        
+    def get_angle(self, centPos, refRpos, refLpos):
+        #vector OC
+        oc = [100*centPos[0], 100*centPos[2]]
+        #vector LR
+        lr = [100*refRpos[0] - 100*refLpos[0], 100*refRpos[2] - 100*refLpos[2]]
+
+        ocLen = (oc[0]**2 + oc[1]**2)**0.5
+        lrLen = (lr[0]**2 + lr[1]**2)**0.5
+        dot = oc[0] * lr[0] + oc[1] * lr[1]
+
+        return math.acos(dot / (ocLen * lrLen))
 
     def run(self):
         # start camera threading
@@ -167,27 +179,56 @@ class armControl:
                 '''
                 use while loop to make sure get something
                 '''
+                time.sleep(1)
                 qrX, qrY = self.camThread.get_qrCenter()
-                while qrX == None or qrY == None:
-                    self.arm.set_tool_position(z=-5, speed=lineSpeed_slow, is_radian=False, wait=True)
-                    qrX, qrY = self.camThread.get_qrCenter()
-
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
                 refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
-                error = 1000*refRpos[2] - 1000*refLpos[2]
-                
 
-                while error > 1.0 or error < -1.0:
-                    pGain = error / 4
-                    print("[+] right - left error:{}, pGain:{}".format(error, pGain))
-                    self.arm.set_tool_position(roll = pGain, speed = abs(pGain), is_radian=False, wait=True)
-
-                    time.sleep(0.1)
+                while centPos[2] < 0.15 or refRpos[2] < 0.15 or refLpos[2] < 0.15:
+                    centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                     refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
                     refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
-                    error = 1000*refRpos[2] - 1000*refLpos[2]
+                
+                print("[+] qrCodeCenter: {}, {}, {}".format(centPos[0], centPos[1], centPos[2]))
+                print("[+] right: {}, {}, {}".format(refRpos[0], refRpos[1], refRpos[2]))
+                print("[+] left: {}, {}, {}".format(refLpos[0], refLpos[1], refLpos[2]))
+                
+                arm2wall_angle = self.get_angle(centPos, refRpos, refLpos)
+                arm2wall_angle_degree = 90 - arm2wall_angle * 180 / math.pi
+                print("angle is: {} -> {} degree".format(arm2wall_angle, arm2wall_angle * 180 / math.pi))
+                self.arm.set_tool_position(roll = arm2wall_angle_degree, speed=1, is_radian=False, wait=True)
+                #arm.set_tool_position(x=100, y=0, z=0, roll=0, pitch=0, yaw=0, speed=100, wait=True)
 
-                print("[+] robot arm algined")
+                '''
+                below is to check angle again
+                '''
+                
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
+                refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
+                arm2wall_angle = self.get_angle(centPos, refRpos, refLpos)
+
+                print("angle is: {} -> {} degree".format(arm2wall_angle, arm2wall_angle * 180 / math.pi))
+
+                                   
+                                   
+                            
+                # if X != None and Y != None:
+                #     xw, yw, zw = self.camThread.cam.getCoordinate(X, Y)  
+                #     xw *= 1000  # transfer to mm
+                #     yw *= 1000
+                #     if abs(xw) > 1:
+                #         print("[+] Targeting QR Code: tool coordinate y:{}".format(int(xw)))
+                #         self.arm.set_tool_position(y = int(xw), speed=10, is_radian=False, wait=True)
+
+
+                #     print("[+] x:{}, y:{}, armPosition:{}".format(xw,yw, self.arm.get_position()))
+                #     cv2.circle(copyFrame, (X, Y), 3, (0, 0, 255), -1)
+
+                # cv2.imshow('QR Code Detect', copyFrame)
+                # cv2.waitKey(1)     
+
                 self.state_machine[3] = True              
             
             #print("[+] state: {}".format(armState))

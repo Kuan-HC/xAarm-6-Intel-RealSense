@@ -18,7 +18,7 @@ if __name__ == "__main__":
         try:
             rgbImage = cam.getColorImage()   
                     
-            X, Y, = track.findQRcode(rgbImage)
+            X, Y, _ = track.findQRcode(rgbImage)
             cv2.namedWindow('Rgb image, ESC to quit', cv2.WINDOW_NORMAL)            
             
             if X != None and Y != None:  # 或者 None

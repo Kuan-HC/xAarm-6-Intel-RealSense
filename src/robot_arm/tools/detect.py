@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import os.path
+import math
 
 class qrCodeDetect:
     def __init__(self):
@@ -22,7 +22,23 @@ class qrCodeDetect:
     def setRefImg(self, imgId = 0):
         imgPath = "./ref_images/" + str(imgId) + ".jpg" 
         refImg = cv2.imread(imgPath, cv2.IMREAD_GRAYSCALE) 
-        self.refImg = self.re_size_photo(refImg, 5)      
+        self.refImg = self.re_size_photo(refImg, 5) 
+
+    def get_angle(self, rPos, lPos, real_rpos, real_lpos):
+        #vector OC
+        img_lr = [rPos[0] - lPos[0], rPos[1] - lPos[1]]
+        #vector LR
+        real_lr = [real_rpos[0] - real_lpos[0], real_rpos[1] - real_lpos[1]]
+
+        ocLen = (img_lr[0]**2 + img_lr[1]**2)**0.5
+        lrLen = (real_lr[0]**2 + real_lr[1]**2)**0.5
+        dot = img_lr[0] * real_lr[0] + img_lr[1] * real_lr[1]
+
+        theta = math.acos(dot / (ocLen * lrLen)) * 180 / math.pi
+        if real_lpos[1] > real_rpos[1]:
+            return - theta
+        
+        return theta   
 
 
     def findQRcode(self,rgbImage):
@@ -63,9 +79,10 @@ class qrCodeDetect:
 
             pts = np.float32([[0, 0], [0, h], [w, h], [w, 0],[w/2, h/2]]).reshape(-1, 1, 2)
             dst = cv2.perspectiveTransform(pts, matrix)
+            theta = self.get_angle([0, 0], [w, 0],dst[0][0], dst[3][0])
             
-            return  int(dst[4][0][0]), int(dst[4][0][1])
+            return  int(dst[4][0][0]), int(dst[4][0][1]), theta
         
-        return None, None
+        return None, None, None
 
 

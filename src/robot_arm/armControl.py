@@ -39,6 +39,7 @@ class state(Enum):
     DEFAULT_CHARGE_POS = 2
     SEARCH_ALIGN = 3
     CHARGE_POS = 4
+    INSERT = 5
 
 thread_lock = threading.Lock()
 
@@ -77,9 +78,11 @@ class camera_thread(threading.Thread):
         return qr_x, qr_y  
     
     def get_theta(self):
-        thread_lock.acquire()
-        theta = self.theta
-        thread_lock.release()
+        theta = None
+        while theta == None:
+            thread_lock.acquire()
+            theta = self.theta
+            thread_lock.release()
 
         return theta
     
@@ -116,9 +119,10 @@ class armControl:
         self.arm.set_state(state=0)
         self.arm.clean_error()
         self.arm.set_self_collision_detection(1)   
+        self.depth_stat_pos = 0 #position before insert charging gun
 
         # state machine states
-        self.state_machine = [False, False, False, False, False]        
+        self.state_machine = [False, False, False, False, False, False]        
 
         #parameter get from ros
         self.action = True   #system get new charging mission, set this parameter to true, arm change position from sleep to move pose
@@ -129,9 +133,10 @@ class armControl:
         self.offset = offset
 
     def get_QRcenter(self, lineSpeed):
-        qrX, qrY = self.camThread.get_qrCenter()
+        qrX = None
+        qrY = None
         while qrX == None or qrY == None:
-            self.arm.set_tool_position(z= -2, speed=lineSpeed, is_radian=False, wait=True)
+            #self.arm.set_tool_position(z= -2, speed=lineSpeed, is_radian=False, wait=True)
             qrX, qrY = self.camThread.get_qrCenter()
         
         return qrX, qrY
@@ -146,21 +151,22 @@ class armControl:
         # tuning parameters
         angleSpeed = 10  # degree/s  
         lineSpeed_norm = 40 # mm/s  
-        lineSpeed_slow = 8 # mm/s
+        lineSpeed_slow = 12 # mm/s
 
         # following parameter for make tool paraller to port
-        roll_thr  = 0.6 # tool parallel to charging port
-        roll_step_factor = 4
+        roll_thr  = 0.8 # tool parallel to charging port
+        roll_step_factor = 5
         roll_speed_factor = 2
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
         yaw_step_factor = 2
-        yaw_speed_factor = 1
+        yaw_speed = 1
 
         #state.CHARGE_POS parameters
-        dist_thr = 0.6
-        move_factor = 4
+        dist_thr = 0.8
+        move_factor = 2
+        speed_factor = 1
 
         while True:
             '''
@@ -184,7 +190,11 @@ class armControl:
 
             elif armState == state.SEARCH_ALIGN:
                 if self.state_machine[3] == True:
-                    armState = state.CHARGE_POS           
+                    armState = state.CHARGE_POS 
+
+            elif armState == state.CHARGE_POS:
+                if self.state_machine[4] == True:
+                    armState = state.INSERT           
 
             '''
             state machine first part
@@ -215,35 +225,53 @@ class armControl:
                 time.sleep(0.3)
 
                 print("[+] Roll angle")
+                nums_left = []
+                nums_right = []
                 while True:
                     qrX, qrY = self.get_QRcenter(lineSpeed_slow)
-                    refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
-                    refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
-                    
-                    if refRpos[2] - 0.0 < 1E-6 or refLpos[2] - 0.0 < 1E-6:
-                        continue
+                    while len(nums_right) < 30 or len(nums_left) < 30:
+                        refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
+                        if abs(refRpos[2] - 0.0) > 1E-6 :
+                            nums_right.append(refRpos[2])
+                        refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
+                        if abs(refLpos[2] - 0.0) > 1E-6:
+                            nums_left.append(refLpos[2])
+       
 
-                    error = 1000 * refRpos[2] - 1000 * refLpos[2]
+                    error = np.median(nums_right) * 1000 - np.median(nums_left) * 1000
+                    nums_right.clear()
+                    nums_left.clear()                   
+
                     if abs(error) < roll_thr:
                         break
 
                     step = error / roll_step_factor  
-                    speed = max(abs(step / roll_speed_factor),0.4)
+                    speed = max(abs(step / roll_speed_factor), 1.0)
                     print("[+] error:{}, step:{:.5}, speed:{:.5}".format(error, step, speed))                 
-                    self.arm.set_tool_position(roll = step, speed = speed, is_radian=False, wait=True)                    
+                    self.arm.set_tool_position(roll = step, speed = yaw_speed, is_radian=False, wait=True)                    
                     time.sleep(0.1)
                     
                 
-                print("[+] Yaw angle")                
+                print("[+] Yaw angle")  
+                nums = []           
                 while True:
                     theta = self.camThread.get_theta()
+                    
+                    """
+                    因sensor精度,取中位數,若要更準確,可用別的filter
+                    """
+                    while len(nums) < 30:
+                        nums.append(theta)
+                    
+                    theta = np.median(nums)
+                    nums.clear()
+
                     if abs(theta) < yaw_thr:
                         break
                     step = theta / yaw_step_factor
-                    speed = abs(theta/ yaw_speed_factor) 
-                    print("[+] theta:{:.5}, pGain:{:.5}".format(theta, step, speed))
-                    self.arm.set_tool_position(yaw = -step, speed = speed, is_radian=False, wait=True)                      
-                    time.sleep(0.05) 
+                    print("[+] theta:{}, step:{:.5}, speed:{}".format(theta, step, speed))
+                    self.arm.set_tool_position(yaw = -step, speed = 1, is_radian=False, wait=True)                      
+                    time.sleep(0.1) 
 
                 self.state_machine[3] = True  
                 print("[+] Robotarm Aligned")             
@@ -256,17 +284,26 @@ class armControl:
                 while True:
                     qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                     centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                    if abs(centPos[2] - 0.0) < 1E-6:
+                        continue
+
                     y_error = (centPos[0] - target[0]) * 1000
                     x_error = (centPos[1] - target[1]) * 1000
                     if abs(y_error) < dist_thr and abs(x_error) < dist_thr:
                         break
-                    speed = int(max(abs(y_error), abs(x_error)))
-                    self.arm.set_tool_position(x = -x_error / move_factor, y = y_error / move_factor, speed = min(speed * 0.8, lineSpeed_slow), is_radian=False, wait=True) 
+                    speed = int(max(abs(y_error), abs(x_error))) * speed_factor
+                    self.arm.set_tool_position(x = -x_error / move_factor, y = y_error / move_factor, speed = min(speed, lineSpeed_slow), is_radian=False, wait=True) 
                     
                 self.state_machine[4] = True  
-                print("[+] Robotarm Ready to Insert")
-                                
-            
+                print("[+] Robotarm Ready to Insert")     
+
+            elif armState == state.INSERT and self.state_machine[5] == False:
+                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                
+                self.arm.set_tool_position(z = centPos[2] * 1000 - 170, speed = lineSpeed_norm, wait = True)
+                print("[+] stereo camera limit reached")
+                self.state_machine[5] = True  
         
         # camera threading
         self.camThread.join()

@@ -69,10 +69,19 @@ class camera_thread(threading.Thread):
         self.offset = int(num)
 
     def get_qrCenter(self):
-        return self.qrCodeX, self.qrCodeY   
+        thread_lock.acquire()
+        qr_x = self.qrCodeX
+        qr_y = self.qrCodeY 
+        thread_lock.release()
+
+        return qr_x, qr_y  
     
     def get_theta(self):
-        return self.theta
+        thread_lock.acquire()
+        theta = self.theta
+        thread_lock.release()
+
+        return theta
     
     def run(self):
         if self.isVisual == True:
@@ -133,9 +142,25 @@ class armControl:
 
         # default settings
         armState = state.INITIALIZE  
+
+        # tuning parameters
         angleSpeed = 10  # degree/s  
         lineSpeed_norm = 40 # mm/s  
         lineSpeed_slow = 8 # mm/s
+
+        # following parameter for make tool paraller to port
+        roll_thr  = 0.6 # tool parallel to charging port
+        roll_step_factor = 4
+        roll_speed_factor = 2
+
+        # following parameter for make tool paraller to port
+        yaw_thr  = 0.6 # tool parallel to charging port
+        yaw_step_factor = 2
+        yaw_speed_factor = 1
+
+        #state.CHARGE_POS parameters
+        dist_thr = 0.6
+        move_factor = 4
 
         while True:
             '''
@@ -175,75 +200,80 @@ class armControl:
 
             elif armState == state.DEFAULT_CHARGE_POS and self.state_machine[2] == False:           
                 self.arm.set_servo_angle(angle=[0, 0, 0, 0, -90, 0], relative = True, speed=angleSpeed, wait=True)
-                #print(self.arm.get_position())
-                self.arm.set_tool_position(z = 25, speed=lineSpeed_norm, is_radian=False, wait=True)
-                #print(self.arm.get_position())                
+                self.arm.set_tool_position(z = 25, speed=lineSpeed_norm, is_radian=False, wait=True)             
                 self.state_machine[2] = True
 
             elif armState == state.SEARCH_ALIGN and self.state_machine[3] == False:
-                self.arm.set_servo_angle(angle=[0, 0, 0, 0, 0, -6], relative = True, speed=angleSpeed, wait=True)
                 '''
                 use while loop to make sure get something
+                1000 is to transfor m to mm
                 '''
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                print("[+] Centering:{:.2}".format(1000 * centPos[0]))
-                self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_norm, is_radian=False, wait=True)
-                
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
-                refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
-                refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
-                error = 1000 * refRpos[2] - 1000 * refLpos[2]
+                print("[+] Centering move:{:.2}".format(1000 * centPos[0]))
+                self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
+                time.sleep(0.3)
 
                 print("[+] Roll angle")
-                while error > 0.6 or error < -0.6:
-                    pGain = error / 3
-                    print("[+] error:{}, pGain:{:.5}".format(error, pGain))
-                    self.arm.set_tool_position(roll = pGain, speed = abs(pGain), is_radian=False, wait=True)
-
-                    time.sleep(0.1)
+                while True:
                     qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                     refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
-                    print("    refRpos:{:.5}, {:.5}, {:.5}".format(refRpos[0], refRpos[1], refRpos[2]))
                     refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
-                    print("    refLpos:{:.5}, {:.5}, {:.5}".format(refLpos[0], refLpos[1], refLpos[2]))
-                    error = 1000 * refRpos[2] - 1000 * refLpos[2]
-                
-                print("[+] Yaw angle")
-                
-                theta = self.camThread.get_theta()
-                while theta > 0.6 or theta < -0.6:
-                    pGain = theta / 5
-                    print("[+] theta:{:.5}, pGain:{:.5}".format(theta, pGain))
-                    self.arm.set_tool_position(yaw = -pGain, speed = abs(theta / 2), is_radian=False, wait=True)  
-                    time.sleep(0.1) 
-                    theta = self.camThread.get_theta()  
+                    
+                    if refRpos[2] - 0.0 < 1E-6 or refLpos[2] - 0.0 < 1E-6:
+                        continue
 
-                print("[+] Robotarm Aligned")          
+                    error = 1000 * refRpos[2] - 1000 * refLpos[2]
+                    if abs(error) < roll_thr:
+                        break
+
+                    step = error / roll_step_factor  
+                    speed = max(abs(step / roll_speed_factor),0.4)
+                    print("[+] error:{}, step:{:.5}, speed:{:.5}".format(error, step, speed))                 
+                    self.arm.set_tool_position(roll = step, speed = speed, is_radian=False, wait=True)                    
+                    time.sleep(0.1)
+                    
                 
-                self.state_machine[3] = True              
+                print("[+] Yaw angle")                
+                while True:
+                    theta = self.camThread.get_theta()
+                    if abs(theta) < yaw_thr:
+                        break
+                    step = theta / yaw_step_factor
+                    speed = abs(theta/ yaw_speed_factor) 
+                    print("[+] theta:{:.5}, pGain:{:.5}".format(theta, step, speed))
+                    self.arm.set_tool_position(yaw = -step, speed = speed, is_radian=False, wait=True)                      
+                    time.sleep(0.05) 
+
+                self.state_machine[3] = True  
+                print("[+] Robotarm Aligned")             
 
                
             elif armState == state.CHARGE_POS and self.state_machine[4] == False:
+
                 target = port_offset[self.qrCodeId]
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                print("[+] prev_pos {}, {}".format(centPos[0],centPos[1]))
-                y_move = centPos[0] - target[0]
-                x_move = centPos[1] - target[1]
-                print("    move:{}, {}".format(y_move, x_move))
-                
-                self.arm.set_tool_position(x = -x_move * 1000, y = y_move * 1000, speed = lineSpeed_slow, is_radian=False, wait=True)    
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)            
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                print("    curr_pos {}, {}".format(centPos[0],centPos[1]))
+
+                while True:
+                    qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                    centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                    y_error = (centPos[0] - target[0]) * 1000
+                    x_error = (centPos[1] - target[1]) * 1000
+                    if abs(y_error) < dist_thr and abs(x_error) < dist_thr:
+                        break
+                    speed = int(max(abs(y_error), abs(x_error)))
+                    self.arm.set_tool_position(x = -x_error / move_factor, y = y_error / move_factor, speed = min(speed * 0.8, lineSpeed_slow), is_radian=False, wait=True) 
+                    
                 self.state_machine[4] = True  
-            #print("[+] state: {}".format(armState))                    
+                print("[+] Robotarm Ready to Insert")
+                                
             
         
         # camera threading
         self.camThread.join()
 
 if __name__ == "__main__":
-    xarm6 = armControl(isVisual = True, offset = 60)
+    #parameters
+    offset_parameter = 60
+
+    xarm6 = armControl(isVisual = True, offset = offset_parameter)
     xarm6.run()

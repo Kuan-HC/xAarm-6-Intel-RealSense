@@ -35,7 +35,7 @@ class qrCodeDetect:
         dot = img_lr[0] * real_lr[0] + img_lr[1] * real_lr[1]
 
         theta = math.acos(dot / (ocLen * lrLen)) * 180 / math.pi
-        if real_lpos[1] > real_rpos[1]:
+        if real_lpos[1] - real_rpos[1] > 1E-6:
             return - theta
         
         return theta   
@@ -80,6 +80,7 @@ class qrCodeDetect:
             pts = np.float32([[0, 0], [0, h], [w, h], [w, 0],[w/2, h/2]]).reshape(-1, 1, 2)
             dst = cv2.perspectiveTransform(pts, matrix)
             theta = self.get_angle([0, 0], [w, 0],dst[0][0], dst[3][0])
+            
             
             return  int(dst[4][0][0]), int(dst[4][0][1]), theta
         

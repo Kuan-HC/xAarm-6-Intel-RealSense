@@ -78,7 +78,7 @@ class camera_thread(threading.Thread):
             
             if self.activeDetect == True:
                 thread_lock.acquire()
-                self.qrCodeX, self.qrCodeY, = self.detect.findQRcode(frame)
+                self.qrCodeX, self.qrCodeY, self.theta = self.detect.findQRcode(frame)
                 thread_lock.release() 
                 if self.qrCodeX != None and self.qrCodeY != None:  
                     cv2.circle(frame, (self.qrCodeX, self.qrCodeY), 3, (0, 0, 255), -1)
@@ -124,6 +124,15 @@ class armControl:
         dot = oc[0] * lr[0] + oc[1] * lr[1]
 
         return math.acos(dot / (ocLen * lrLen))
+
+    def get_QRcenter(self, lineSpeed):
+        qrX = None
+        qrY = None
+        while qrX == None or qrY == None:
+            #self.arm.set_tool_position(z= -2, speed=lineSpeed, is_radian=False, wait=True)
+            qrX, qrY = self.camThread.get_qrCenter()
+        
+        return qrX, qrY
 
     def run(self):
         # start camera threading
@@ -180,7 +189,12 @@ class armControl:
                 use while loop to make sure get something
                 '''
                 time.sleep(1)
-                qrX, qrY = self.camThread.get_qrCenter()
+                qrX, qrY = self.get_QRcenter(8)
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                print("[+] Centering move:{:.2}".format(1000 * centPos[0]))
+                self.arm.set_tool_position(y = 1000 * centPos[0], speed = 8, is_radian=False, wait=True)
+                time.sleep(0.3)
+                                                
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
                 refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
@@ -197,38 +211,10 @@ class armControl:
                 arm2wall_angle = self.get_angle(centPos, refRpos, refLpos)
                 arm2wall_angle_degree = 90 - arm2wall_angle * 180 / math.pi
                 print("angle is: {} -> {} degree".format(arm2wall_angle, arm2wall_angle * 180 / math.pi))
+                print("rotate {:.5} degree".format(arm2wall_angle_degree))
                 self.arm.set_tool_position(roll = arm2wall_angle_degree, speed=1, is_radian=False, wait=True)
                 #arm.set_tool_position(x=100, y=0, z=0, roll=0, pitch=0, yaw=0, speed=100, wait=True)
-
-                '''
-                below is to check angle again
-                '''
-                
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)
-                refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)
-                arm2wall_angle = self.get_angle(centPos, refRpos, refLpos)
-
-                print("angle is: {} -> {} degree".format(arm2wall_angle, arm2wall_angle * 180 / math.pi))
-
-                                   
-                                   
-                            
-                # if X != None and Y != None:
-                #     xw, yw, zw = self.camThread.cam.getCoordinate(X, Y)  
-                #     xw *= 1000  # transfer to mm
-                #     yw *= 1000
-                #     if abs(xw) > 1:
-                #         print("[+] Targeting QR Code: tool coordinate y:{}".format(int(xw)))
-                #         self.arm.set_tool_position(y = int(xw), speed=10, is_radian=False, wait=True)
-
-
-                #     print("[+] x:{}, y:{}, armPosition:{}".format(xw,yw, self.arm.get_position()))
-                #     cv2.circle(copyFrame, (X, Y), 3, (0, 0, 255), -1)
-
-                # cv2.imshow('QR Code Detect', copyFrame)
-                # cv2.waitKey(1)     
-
+                print("rotate finish")
                 self.state_machine[3] = True              
             
             #print("[+] state: {}".format(armState))

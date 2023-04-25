@@ -35,8 +35,9 @@ class qrCodeDetect:
         dot = img_lr[0] * real_lr[0] + img_lr[1] * real_lr[1]
 
         theta = math.acos(dot / (ocLen * lrLen)) * 180 / math.pi
-        if real_lpos[1] - real_rpos[1] > 1E-6:
-            return - theta
+        
+        if real_lpos[1]  > real_rpos[1]:
+            return -theta
         
         return theta   
 

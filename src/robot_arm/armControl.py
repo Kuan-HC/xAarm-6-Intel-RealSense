@@ -149,18 +149,18 @@ class armControl:
         armState = state.INITIALIZE  
 
         # tuning parameters
-        angleSpeed = 10  # degree/s  
-        lineSpeed_norm = 40 # mm/s  
+        angleSpeed = 20 # degree/s  
+        lineSpeed_norm = 30 # mm/s  
         lineSpeed_slow = 12 # mm/s
 
         # following parameter for make tool paraller to port
         roll_thr  = 0.8 # tool parallel to charging port
         roll_step_factor = 5
-        roll_speed = 1
+        roll_speed = 1.5
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
-        yaw_step_factor = 3
+        yaw_step_factor = 4
         yaw_speed = 1
 
         #state.CHARGE_POS parameters
@@ -231,25 +231,22 @@ class armControl:
                         refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)[2]
                         refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)[2]
 
-                    error = refRpos * 1000 - refLpos * 1000                
-
+                    error = refRpos * 1000 - refLpos * 1000               
                     if abs(error) < roll_thr:
                         break
 
-                    step = error / roll_step_factor  
-                    
-                    print("[+] error:{}, step:{:.5}, speed:{}".format(error, step, roll_speed))                 
+                    step = round((error / roll_step_factor), 2)
+                    print("    error:{:.5}, step:{:.5}, speed:{}".format(error, step, roll_speed))                 
                     self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
                     time.sleep(0.1)                    
                 
                 print("[+] Yaw angle")            
                 while True:
-                    theta = self.camThread.get_theta()
-                    print("[+] theta:{:.4}".format(theta))
+                    theta = self.camThread.get_theta()                    
                     if abs(theta) < yaw_thr:
                         break
-                    step = theta / yaw_step_factor
-                    print("    step:{:.5}, speed:{}".format(step, yaw_speed))
+                    step = round((theta / yaw_step_factor),1)
+                    print("    theta:{:.4}, step:{:.1}, speed:{}".format(theta, step, yaw_speed))
                     self.arm.set_tool_position(yaw = -step, speed = yaw_speed, is_radian=False, wait=True)                      
                     time.sleep(0.1) 
 
@@ -258,7 +255,7 @@ class armControl:
 
                
             elif armState == state.CHARGE_POS and self.state_machine[4] == False:
-
+                print("[+] Move to charging port")
                 target = port_offset[self.qrCodeId]
 
                 while True:
@@ -271,8 +268,9 @@ class armControl:
                     x_error = (centPos[1] - target[1]) * 1000
                     if abs(y_error) < dist_thr and abs(x_error) < dist_thr:
                         break
-
+                    
                     speed = min(int(max(abs(y_error), abs(x_error))), lineSpeed_slow)
+                    print("    tool coordindate x:{:.5}, y:{:.5}, speed:{}".format(-x_error, y_error, max(speed, 1)))
                     self.arm.set_tool_position(x = -x_error, y = y_error, speed = max(speed, 1), is_radian=False, wait=True) 
                     
                 self.state_machine[4] = True  

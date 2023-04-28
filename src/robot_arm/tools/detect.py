@@ -69,7 +69,6 @@ class qrCodeDetect:
             cv2.imshow('MatchesPoints', img3)
             cv2.waitKey(1)  
 
-
         if len(good_points) > 50:
             query_pts = np.float32([kp_image[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
             train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)

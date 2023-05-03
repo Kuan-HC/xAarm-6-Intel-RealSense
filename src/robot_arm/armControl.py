@@ -40,6 +40,8 @@ class state(Enum):
     SEARCH_ALIGN = 3
     CHARGE_POS = 4
     INSERT = 5
+    CHARGING = 6
+    PULL = 7
 
 thread_lock = threading.Lock()
 
@@ -166,6 +168,10 @@ class armControl:
         #state.CHARGE_POS parameters
         dist_thr = 0.8
 
+        # last insert phase each step distance
+        lastPhaseStep = 0.2
+        movement = 0.0 #total movement in insert phase
+
         while True:
             '''
             state machine first part
@@ -220,7 +226,7 @@ class armControl:
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 print("[+] Centering move:{:.2}".format(1000 * centPos[0]))
                 self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
-                time.sleep(0.3)
+                time.sleep(1)
 
                 print("[+] Roll angle")               
                 while True:
@@ -240,6 +246,7 @@ class armControl:
                     self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
                     time.sleep(0.1)                    
                 
+                time.sleep(1)
                 print("[+] Yaw angle")            
                 while True:
                     theta = self.camThread.get_theta()                    
@@ -280,9 +287,24 @@ class armControl:
                 print("[+] insert phase I")
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                
-                self.arm.set_tool_position(z = centPos[2] * 1000 - 170, speed = lineSpeed_norm, wait = True)
+                movement = centPos[2] * 1000 - 170
+                self.arm.set_tool_position(z = movement, speed = lineSpeed_norm, wait = True)
                 print("    reach stereo camera limit")
+
+                print("[+] insert phase II")
+                '''
+                Code below is just for test
+                '''
+                self.arm.set_mode(1)
+                self.arm.set_state(state=0)
+                time.sleep(1)
+                for i in range(100):
+                    time.sleep(0.025)
+                    code = self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
+                    print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))
+                    movement += lastPhaseStep
+
+
                 self.state_machine[5] = True  
         
         # camera threading

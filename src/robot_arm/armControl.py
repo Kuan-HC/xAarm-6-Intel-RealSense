@@ -37,7 +37,7 @@ class state(Enum):
     INITIALIZE = 0
     MOVE_POS = 1
     DEFAULT_CHARGE_POS = 2
-    SEARCH_ALIGN = 3
+    ROLL_CENTER = 3
     CHARGE_POS = 4
     INSERT = 5
     CHARGING = 6
@@ -154,6 +154,7 @@ class armControl:
         angleSpeed = 20 # degree/s  
         lineSpeed_norm = 30 # mm/s  
         lineSpeed_slow = 12 # mm/s
+        alignDistance = 200 # mm
 
         # following parameter for make tool paraller to port
         roll_thr  = 0.8 # tool parallel to charging port
@@ -190,9 +191,9 @@ class armControl:
                     self.camThread.set_detect_ref_img(self.qrCodeId)
                     self.camThread.set_detect(True)
                     self.camThread.set_offset(self.offset)
-                    armState = state.SEARCH_ALIGN    
+                    armState = state.ROLL_CENTER    
 
-            elif armState == state.SEARCH_ALIGN:
+            elif armState == state.ROLL_CENTER:
                 if self.state_machine[3] == True:
                     armState = state.CHARGE_POS 
 
@@ -217,14 +218,14 @@ class armControl:
                 self.arm.set_tool_position(z = 25, speed=lineSpeed_norm, is_radian=False, wait=True)             
                 self.state_machine[2] = True
 
-            elif armState == state.SEARCH_ALIGN and self.state_machine[3] == False:
+            elif armState == state.ROLL_CENTER and self.state_machine[3] == False:
                 '''
                 use while loop to make sure get something
                 1000 is to transfor m to mm
                 '''
+                print("[+] QR center to width center")
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                print("[+] Centering move:{:.2}".format(1000 * centPos[0]))
                 self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
                 time.sleep(1)
 
@@ -244,22 +245,21 @@ class armControl:
                     step = round((error / roll_step_factor), 2)
                     print("    error:{:.5}, step:{:.5}, speed:{}".format(error, step, roll_speed))                 
                     self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
-                    time.sleep(0.1)   
+                    time.sleep(0.2)   
 
+
+                print("[+] QR center to image center")
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                print("[+] Centering move:{:.2}".format(1000 * centPos[0]))
-                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
-                time.sleep(1)                 
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)                
+                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)                
                 
-                print("[+] Move forward to 20cm")
+                print("[+] Move forward to {} mm".format(alignDistance))
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                movement = centPos[2] * 1000 -200
+                movement = centPos[2] * 1000 - alignDistance
                 self.arm.set_tool_position(z = movement, speed = lineSpeed_norm, wait = True)
 
-                self.state_machine[3] = True  
-                print("[+] Robotarm in 20cm position")             
+                self.state_machine[3] = True           
 
                
             elif armState == state.CHARGE_POS and self.state_machine[4] == False:
@@ -303,7 +303,7 @@ class armControl:
                 self.arm.set_mode(1)
                 self.arm.set_state(state=0)
                 time.sleep(1)
-                for i in range(100):
+                for i in range(200):
                     time.sleep(0.025)
                     code = self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
                     print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))

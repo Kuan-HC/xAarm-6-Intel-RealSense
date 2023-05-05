@@ -64,7 +64,7 @@ class qrCodeDetect:
             if m.distance < 0.5 * n.distance:
                 good_points.append(m)
         
-        drawMatches = True
+        drawMatches = False
         if drawMatches == True:
             img3 = cv2.drawMatches(self.refImg, self.kp_image, rgbImage, kp_grayframe, good_points, rgbImage,
                                flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)

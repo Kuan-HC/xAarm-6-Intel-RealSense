@@ -38,7 +38,7 @@ class state(Enum):
     MOVE_POS = 1
     DEFAULT_CHARGE_POS = 2
     ROLL_CENTER = 3
-    CHARGE_POS = 4
+    YAW_CHARGE_POS = 4
     INSERT = 5
     CHARGING = 6
     PULL = 7
@@ -166,7 +166,7 @@ class armControl:
         yaw_step_factor = 4
         yaw_speed = 1
 
-        #state.CHARGE_POS parameters
+        #state.YAW_CHARGE_POS parameters
         dist_thr = 0.8
 
         # last insert phase each step distance
@@ -195,9 +195,9 @@ class armControl:
 
             elif armState == state.ROLL_CENTER:
                 if self.state_machine[3] == True:
-                    armState = state.CHARGE_POS 
+                    armState = state.YAW_CHARGE_POS 
 
-            elif armState == state.CHARGE_POS:
+            elif armState == state.YAW_CHARGE_POS:
                 if self.state_machine[4] == True:
                     armState = state.INSERT           
 
@@ -262,7 +262,7 @@ class armControl:
                 self.state_machine[3] = True           
 
                
-            elif armState == state.CHARGE_POS and self.state_machine[4] == False:
+            elif armState == state.YAW_CHARGE_POS and self.state_machine[4] == False:
                 print("[+] Yaw angle")     
                 time.sleep(1.0)       
                 while True:

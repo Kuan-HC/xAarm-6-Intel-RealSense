@@ -53,7 +53,7 @@ class qrCodeDetect:
         '''
         creat input image detrector and descriptor
         '''
-        start = cv2.getTickCount()
+        
         kp_grayframe, desc_grayframe = self.sift.detectAndCompute(rgbImage, None)
 
         #matches = self.flann.knnMatch(self.desc_image, desc_grayframe, k=2)
@@ -73,11 +73,7 @@ class qrCodeDetect:
             cv2.imshow('MatchesPoints', img3)
             cv2.waitKey(1)  
 
-        end = cv2.getTickCount()
-        during1 = (end - start) / cv2.getTickFrequency()
-
-        print("Good points:{}, time comsumption{}".format(len(good_points), during1))
-        if len(good_points) > 50:
+        if len(good_points) > 15:
             query_pts = np.float32([self.kp_image[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
             train_pts = np.float32([kp_grayframe[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
 

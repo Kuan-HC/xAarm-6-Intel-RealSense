@@ -244,10 +244,27 @@ class armControl:
                     step = round((error / roll_step_factor), 2)
                     print("    error:{:.5}, step:{:.5}, speed:{}".format(error, step, roll_speed))                 
                     self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
-                    time.sleep(0.1)                    
+                    time.sleep(0.1)   
+
+                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                print("[+] Centering move:{:.2}".format(1000 * centPos[0]))
+                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
+                time.sleep(1)                 
                 
-                time.sleep(1)
-                print("[+] Yaw angle")            
+                print("[+] Move forward to 20cm")
+                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                movement = centPos[2] * 1000 -200
+                self.arm.set_tool_position(z = movement, speed = lineSpeed_norm, wait = True)
+
+                self.state_machine[3] = True  
+                print("[+] Robotarm in 20cm position")             
+
+               
+            elif armState == state.CHARGE_POS and self.state_machine[4] == False:
+                print("[+] Yaw angle")     
+                time.sleep(1.0)       
                 while True:
                     theta = self.camThread.get_theta()                    
                     if abs(theta) < yaw_thr:
@@ -257,11 +274,6 @@ class armControl:
                     self.arm.set_tool_position(yaw = -step, speed = yaw_speed, is_radian=False, wait=True)                      
                     time.sleep(0.1) 
 
-                self.state_machine[3] = True  
-                print("[+] Robotarm Aligned")             
-
-               
-            elif armState == state.CHARGE_POS and self.state_machine[4] == False:
                 print("[+] Move to charging port")
                 target = port_offset[self.qrCodeId]
 
@@ -283,15 +295,8 @@ class armControl:
                 self.state_machine[4] = True  
                 print("[+] Robotarm Ready to Insert")     
 
-            elif armState == state.INSERT and self.state_machine[5] == False:
-                print("[+] insert phase I")
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                movement = centPos[2] * 1000 - 170
-                self.arm.set_tool_position(z = movement, speed = lineSpeed_norm, wait = True)
-                print("    reach stereo camera limit")
-
-                print("[+] insert phase II")
+            elif armState == state.INSERT and self.state_machine[5] == False:                              
+                print("[+] insert ")
                 '''
                 Code below is just for test
                 '''
@@ -303,7 +308,6 @@ class armControl:
                     code = self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
                     print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))
                     movement += lastPhaseStep
-
 
                 self.state_machine[5] = True  
         

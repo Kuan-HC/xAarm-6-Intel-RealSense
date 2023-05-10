@@ -156,16 +156,17 @@ class armControl:
         lineSpeed_slow = 12 # mm/s
         alignDistance = 200 # mm
 
+        sampleLen = 20
         # following parameter for make tool paraller to port
         roll_thr  = 0.8 # tool parallel to charging port
-        roll_step_factor = 5
-        roll_speed = 1.5
+        roll_step_factor = 4
+        roll_speed = 3
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
         yaw_step_factor = 1
-        yaw_speed = 2
-        sampleLen = 30
+        yaw_speed = 3
+        
 
         #state.YAW_CHARGE_POS parameters
         dist_thr = 0.8
@@ -228,26 +229,33 @@ class armControl:
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
-                time.sleep(1)
 
-                print("[+] Roll angle")               
+                print("[+] Roll angle")     
+                time.sleep(2.0)            
                 while True:
                     qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                     refRpos = 0.0
                     refLpos = 0.0
-                    while refRpos < 0.1 or refLpos < 0.1:  #realense nearest range is 0.14
-                        refRpos = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)[2]
-                        refLpos = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)[2]
-
+                    
+                    for i in range(sampleLen):
+                        rMeasure = 0.0
+                        lMeasure = 0.0
+                        while rMeasure < 0.1 or lMeasure < 0.1:
+                            rMeasure = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)[2]
+                            lMeasure = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)[2]                        
+                        refRpos += rMeasure
+                        refLpos += lMeasure
+                    
+                    refRpos /= sampleLen
+                    refLpos /= sampleLen                                       
                     error = refRpos * 1000 - refLpos * 1000               
                     if abs(error) < roll_thr:
                         break
 
-                    step = round((error / roll_step_factor), 2)
-                    print("    error:{:.5}, step:{:.5}, speed:{}".format(error, step, roll_speed))                 
+                    step = round((error / roll_step_factor), 1)
+                    print("    error:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
                     self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
-                    time.sleep(0.2)   
-
+                    time.sleep(0.1)   
 
                 print("[+] QR center to image center")
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
@@ -275,8 +283,8 @@ class armControl:
                                     
                     if abs(theta) < yaw_thr:
                         break
-                    step = round((theta / yaw_step_factor),yaw_speed)
-                    print("    theta:{:.4}, step:{:.1}, speed:{}".format(theta, step, yaw_speed))
+                    step = round((theta / yaw_step_factor),1)
+                    print("    theta:{:.4}, step:{:.2}, speed:{}".format(theta, step, yaw_speed))
                     self.arm.set_tool_position(yaw = -step, speed = yaw_speed, is_radian=False, wait=True)                      
                     time.sleep(0.1) 
 

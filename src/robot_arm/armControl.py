@@ -163,8 +163,9 @@ class armControl:
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
-        yaw_step_factor = 4
-        yaw_speed = 1
+        yaw_step_factor = 1
+        yaw_speed = 2
+        sampleLen = 30
 
         #state.YAW_CHARGE_POS parameters
         dist_thr = 0.8
@@ -266,10 +267,15 @@ class armControl:
                 print("[+] Yaw angle")     
                 time.sleep(1.0)       
                 while True:
-                    theta = self.camThread.get_theta()                    
+                    theta = 0.0
+                    
+                    for i in range(sampleLen):
+                        theta += self.camThread.get_theta()
+                    theta /= sampleLen
+                                    
                     if abs(theta) < yaw_thr:
                         break
-                    step = round((theta / yaw_step_factor),1)
+                    step = round((theta / yaw_step_factor),yaw_speed)
                     print("    theta:{:.4}, step:{:.1}, speed:{}".format(theta, step, yaw_speed))
                     self.arm.set_tool_position(yaw = -step, speed = yaw_speed, is_radian=False, wait=True)                      
                     time.sleep(0.1) 
@@ -277,6 +283,7 @@ class armControl:
                 print("[+] Move to charging port")
                 target = port_offset[self.qrCodeId]
 
+                time.sleep(0.5)
                 while True:
                     qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                     centPos = self.camThread.cam.getCoordinate(qrX, qrY)
@@ -306,7 +313,7 @@ class armControl:
                 for i in range(200):
                     time.sleep(0.025)
                     code = self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
-                    print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))
+                    #print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))
                     movement += lastPhaseStep
 
                 self.state_machine[5] = True  

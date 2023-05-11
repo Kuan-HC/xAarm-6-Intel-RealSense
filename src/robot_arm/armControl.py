@@ -201,7 +201,10 @@ class armControl:
 
             elif armState == state.YAW_CHARGE_POS:
                 if self.state_machine[4] == True:
-                    armState = state.INSERT           
+                    armState = state.INSERT   
+                    self.arm.set_mode(1)
+                    self.arm.set_state(state=0) 
+                    self.arm.set_self_collision_detection(0)         
 
             '''
             state machine first part
@@ -258,10 +261,11 @@ class armControl:
                     time.sleep(0.1)   
 
                 print("[+] QR center to image center")
+                time.sleep(1.0)
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)                
-                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)                
-                
+                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)  
+
                 print("[+] Move forward to {} mm".format(alignDistance))
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
@@ -315,12 +319,11 @@ class armControl:
                 '''
                 Code below is just for test
                 '''
-                self.arm.set_mode(1)
-                self.arm.set_state(state=0)
+                
                 time.sleep(1)
-                for i in range(200):
+                for i in range(400):
                     time.sleep(0.025)
-                    code = self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
+                    self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
                     #print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))
                     movement += lastPhaseStep
 

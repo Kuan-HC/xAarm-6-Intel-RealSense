@@ -315,18 +315,23 @@ class armControl:
                 print("[+] Robotarm Ready to Insert")     
 
             elif armState == state.INSERT and self.state_machine[5] == False:                              
-                print("[+] insert ")
+                print("[+] Plug ")
                 '''
                 Code below is just for test
                 '''
                 
                 time.sleep(1)
-                for i in range(400):
-                    time.sleep(0.025)
+                toolDigInput_1 = False
+                while toolDigInput_1 == False:
                     self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
-                    #print('set_servo_cartesian_aa, code={}, i={}, step={}'.format(code, i, lastPhaseStep))
                     movement += lastPhaseStep
+                    time.sleep(0.025)
 
+                    _, digitals = self.arm.get_tgpio_digital()
+                    toolDigInput_1 = digitals[0]
+                    print('IO0 input {}'.format(toolDigInput_1))
+
+                print("    Plug completted ")  
                 self.state_machine[5] = True  
         
         # camera threading

@@ -39,9 +39,9 @@ class state(Enum):
     DEFAULT_CHARGE_POS = 2
     ROLL_CENTER = 3
     YAW_CHARGE_POS = 4
-    INSERT = 5
+    PLUG = 5
     CHARGING = 6
-    PULL = 7
+    DISENGAGE = 7
 
 thread_lock = threading.Lock()
 
@@ -124,9 +124,9 @@ class armControl:
         self.depth_stat_pos = 0 #position before insert charging gun
 
         # state machine states
-        self.state_machine = [False, False, False, False, False, False]        
+        self.state_machine = [False, False, False, False, False, False, False, False]        
 
-        #parameter get from ros
+        #parameter get from ros communication
         self.action = True   #system get new charging mission, set this parameter to true, arm change position from sleep to move pose
         self.mobile_on_spot = True
         self.qrCodeId = 0
@@ -152,7 +152,7 @@ class armControl:
 
         # tuning parameters
         angleSpeed = 20 # degree/s  
-        lineSpeed_norm = 30 # mm/s  
+        lineSpeed_norm = 20 # mm/s  
         lineSpeed_slow = 12 # mm/s
         alignDistance = 200 # mm
 
@@ -201,10 +201,28 @@ class armControl:
 
             elif armState == state.YAW_CHARGE_POS:
                 if self.state_machine[4] == True:
-                    armState = state.INSERT   
+                    armState = state.PLUG   
                     self.arm.set_mode(1)
                     self.arm.set_state(state=0) 
-                    self.arm.set_self_collision_detection(0)         
+                    self.arm.set_self_collision_detection(0)   
+
+            elif armState == state.PLUG:  
+                if self.state_machine[5] == True:
+                    armState = state.CHARGING
+
+            elif armState == state.CHARGING:  
+                if self.state_machine[6] == True:
+                    armState = state.DISENGAGE
+
+            elif armState == state.DISENGAGE:
+                if self.state_machine[7] == True:
+                    self.arm.set_mode(0)
+                    self.arm.set_state(state=0)
+                    self.arm.set_self_collision_detection(1)
+                    armState = state.MOVE_POS
+                    self.state_machine[1] = False
+                    self.mobile_on_spot = False
+
 
             '''
             state machine first part
@@ -269,18 +287,15 @@ class armControl:
                 print("[+] Move forward to {} mm".format(alignDistance))
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                movement = centPos[2] * 1000 - alignDistance
-                self.arm.set_tool_position(z = movement, speed = lineSpeed_norm, wait = True)
-
+                self.arm.set_tool_position(z = centPos[2] * 1000 - alignDistance, speed = lineSpeed_norm, wait = True)
                 self.state_machine[3] = True           
 
                
             elif armState == state.YAW_CHARGE_POS and self.state_machine[4] == False:
                 print("[+] Yaw angle")     
-                time.sleep(1.0)       
+                time.sleep(3.0)       
                 while True:
-                    theta = 0.0
-                    
+                    theta = 0.0                    
                     for i in range(sampleLen):
                         theta += self.camThread.get_theta()
                     theta /= sampleLen
@@ -314,12 +329,11 @@ class armControl:
                 self.state_machine[4] = True  
                 print("[+] Robotarm Ready to Insert")     
 
-            elif armState == state.INSERT and self.state_machine[5] == False:                              
+            elif armState == state.PLUG and self.state_machine[5] == False:                              
                 print("[+] Plug ")
                 '''
                 Code below is just for test
                 '''
-                
                 time.sleep(1)
                 toolDigInput_1 = False
                 while toolDigInput_1 == False:
@@ -329,11 +343,27 @@ class armControl:
 
                     _, digitals = self.arm.get_tgpio_digital()
                     toolDigInput_1 = digitals[0]
-                    print('IO0 input {}'.format(toolDigInput_1))
 
                 print("    Plug completted ")  
                 self.state_machine[5] = True  
+
+            elif armState == state.CHARGING and self.state_machine[6] == False: 
+                print("[+] Charging")
+                time.sleep(5)
+                self.state_machine[6] = True 
         
+            elif armState == state.DISENGAGE and self.state_machine[7] == False: 
+                print("[+] Disengage")
+                movement += 50 #offset 10mm 
+                while movement > 0.0:
+                    self.arm.set_servo_cartesian_aa([0, 0, -lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
+                    movement -= lastPhaseStep
+                    time.sleep(0.025)
+
+                time.sleep(2)
+                self.state_machine[7] = True
+
+
         # camera threading
         self.camThread.join()
 

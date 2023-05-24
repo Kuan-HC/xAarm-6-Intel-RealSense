@@ -205,6 +205,7 @@ class armControl:
                     self.arm.set_mode(1)
                     self.arm.set_state(state=0) 
                     self.arm.set_self_collision_detection(0)   
+                    self.camThread.set_detect(False)
 
             elif armState == state.PLUG:  
                 if self.state_machine[5] == True:

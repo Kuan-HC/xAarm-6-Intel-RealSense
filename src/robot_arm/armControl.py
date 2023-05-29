@@ -30,8 +30,7 @@ xarm_pkg = os.path.join(os.path.dirname(__file__), 'tools/xArm-Python-SDK')
 sys.path.append(xarm_pkg)
 from xarm.wrapper import XArmAPI
 
-#port_offset = [[-0.0288, 0.0151]]
-port_offset = [[-0.029, 0.016]]
+port_offset = [[-0.029, 0.015]]
  
 class state(Enum):
     INITIALIZE = 0
@@ -102,7 +101,8 @@ class camera_thread(threading.Thread):
                 if self.qrCodeX != None and self.qrCodeY != None:  
                     cv2.circle(frame, (self.qrCodeX, self.qrCodeY), 3, (0, 0, 255), -1)
                     cv2.circle(frame, (self.qrCodeX + self.offset, self.qrCodeY), 3, (255, 0, 0), -1)
-                    cv2.circle(frame, (self.qrCodeX - self.offset, self.qrCodeY), 3, (255, 0, 0), -1)                      
+                    cv2.circle(frame, (self.qrCodeX - self.offset, self.qrCodeY), 3, (255, 0, 0), -1)  
+                    cv2.circle(frame, (self.qrCodeX, self.qrCodeY + 2 * self.offset), 3, (255, 0, 0), -1)                    
             
             if self.isVisual == True:
                 cv2.imshow('Vision', frame)
@@ -158,9 +158,10 @@ class armControl:
 
         sampleLen = 20
         # following parameter for make tool paraller to port
-        roll_thr  = 0.8 # tool parallel to charging port
-        roll_step_factor = 4
-        roll_speed = 3
+        roll_thr  = 0.6 # tool parallel to charging port
+        pitch_thr = 0.6
+        step_factor = 3.5
+        roll_speed = 2
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
@@ -272,9 +273,10 @@ class armControl:
                     refLpos /= sampleLen                                       
                     error = refRpos * 1000 - refLpos * 1000               
                     if abs(error) < roll_thr:
+                        print("    error:{:.5}".format(error))
                         break
 
-                    step = round((error / roll_step_factor), 1)
+                    step = round((error / step_factor), 1)
                     print("    error:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
                     self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
                     time.sleep(0.1)   
@@ -285,11 +287,40 @@ class armControl:
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)                
                 self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)  
 
+                print("[+] Pitch angle")    
+                time.sleep(2.0)            
+                while True:
+                    qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                    upPos = 0.0
+                    downPos = 0.0
+                    
+                    for i in range(sampleLen):
+                        upMeasure = 0.0
+                        downMeasure = 0.0
+                        
+                        while upMeasure < 0.1 or downMeasure < 0.1:
+                            upMeasure = self.camThread.cam.getCoordinate(qrX, qrY)[2]
+                            downMeasure = self.camThread.cam.getCoordinate(qrX, qrY + 2 * self.offset)[2]                        
+                        upPos += upMeasure
+                        downPos += downMeasure
+                    
+                    upPos /= sampleLen
+                    downPos /= sampleLen                                       
+                    error = downPos * 1000 - upPos * 1000               
+                    if abs(error) < pitch_thr:
+                        print("    error:{:.5}".format(error))
+                        break
+
+                    step = round((error / step_factor), 1)
+                    print("    error:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
+                    self.arm.set_tool_position(pitch = step, speed = roll_speed, is_radian=False, wait=True)                    
+                    time.sleep(0.1)      
+
                 print("[+] Move forward to {} mm".format(alignDistance))
                 qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 self.arm.set_tool_position(z = centPos[2] * 1000 - alignDistance, speed = lineSpeed_norm, wait = True)
-                self.state_machine[3] = True           
+                self.state_machine[3] = True        
 
                
             elif armState == state.YAW_CHARGE_POS and self.state_machine[4] == False:
@@ -311,8 +342,8 @@ class armControl:
                 print("[+] Move to charging port")
                 target = port_offset[self.qrCodeId]
 
-                time.sleep(0.5)
                 while True:
+                    time.sleep(1)
                     qrX, qrY = self.get_QRcenter(lineSpeed_slow)
                     centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                     if abs(centPos[2] - 0.0) < 1E-6:
@@ -370,7 +401,7 @@ class armControl:
 
 if __name__ == "__main__":
     #parameters
-    offset_parameter = 60
+    offset_parameter = 70
 
     xarm6 = armControl(isVisual = True, offset = offset_parameter)
     xarm6.run()

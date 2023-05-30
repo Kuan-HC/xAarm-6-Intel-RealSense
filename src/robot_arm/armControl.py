@@ -157,6 +157,7 @@ class armControl:
         alignDistance = 200 # mm
 
         sampleLen = 20
+        sampleLenLong = 40
         # following parameter for make tool paraller to port
         roll_thr  = 0.6 # tool parallel to charging port
         pitch_thr = 0.6
@@ -294,7 +295,7 @@ class armControl:
                     upPos = 0.0
                     downPos = 0.0
                     
-                    for i in range(sampleLen):
+                    for i in range(sampleLenLong):
                         upMeasure = 0.0
                         downMeasure = 0.0
                         
@@ -304,8 +305,8 @@ class armControl:
                         upPos += upMeasure
                         downPos += downMeasure
                     
-                    upPos /= sampleLen
-                    downPos /= sampleLen                                       
+                    upPos /= sampleLenLong
+                    downPos /= sampleLenLong                                       
                     error = downPos * 1000 - upPos * 1000               
                     if abs(error) < pitch_thr:
                         print("    error:{:.5}".format(error))
@@ -328,9 +329,9 @@ class armControl:
                 time.sleep(3.0)       
                 while True:
                     theta = 0.0                    
-                    for i in range(sampleLen):
+                    for i in range(sampleLenLong):
                         theta += self.camThread.get_theta()
-                    theta /= sampleLen
+                    theta /= sampleLenLong
                                     
                     if abs(theta) < yaw_thr:
                         break

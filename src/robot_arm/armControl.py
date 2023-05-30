@@ -134,7 +134,7 @@ class armControl:
         #parameter for target QR code
         self.offset = offset
 
-    def get_QRcenter(self, lineSpeed):
+    def get_QRcenter(self):
         qrX = None
         qrY = None
         while qrX == None or qrY == None:
@@ -153,7 +153,7 @@ class armControl:
         # tuning parameters
         angleSpeed = 20 # degree/s  
         lineSpeed_norm = 20 # mm/s  
-        lineSpeed_slow = 12 # mm/s
+        lineSpeed_slow = 10 # mm/s
         alignDistance = 200 # mm
 
         sampleLen = 20
@@ -250,14 +250,14 @@ class armControl:
                 1000 is to transfor m to mm
                 '''
                 print("[+] QR center to width center")
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                qrX, qrY = self.get_QRcenter()
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
 
                 print("[+] Roll angle")     
                 time.sleep(2.0)            
                 while True:
-                    qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                    qrX, qrY = self.get_QRcenter()
                     refRpos = 0.0
                     refLpos = 0.0
                     
@@ -284,14 +284,14 @@ class armControl:
 
                 print("[+] QR center to image center")
                 time.sleep(1.0)
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                qrX, qrY = self.get_QRcenter()
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)                
                 self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)  
 
                 print("[+] Pitch angle")    
                 time.sleep(2.0)            
                 while True:
-                    qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                    qrX, qrY = self.get_QRcenter()
                     upPos = 0.0
                     downPos = 0.0
                     
@@ -318,7 +318,7 @@ class armControl:
                     time.sleep(0.1)      
 
                 print("[+] Move forward to {} mm".format(alignDistance))
-                qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                qrX, qrY = self.get_QRcenter()
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 self.arm.set_tool_position(z = centPos[2] * 1000 - alignDistance, speed = lineSpeed_norm, wait = True)
                 self.state_machine[3] = True        
@@ -345,7 +345,7 @@ class armControl:
 
                 while True:
                     time.sleep(1)
-                    qrX, qrY = self.get_QRcenter(lineSpeed_slow)
+                    qrX, qrY = self.get_QRcenter()
                     centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                     if abs(centPos[2] - 0.0) < 1E-6:
                         continue

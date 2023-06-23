@@ -30,8 +30,9 @@ xarm_pkg = os.path.join(os.path.dirname(__file__), 'tools/xArm-Python-SDK')
 sys.path.append(xarm_pkg)
 from xarm.wrapper import XArmAPI
 
-port_offset = [[-0.029, 0.015]]
- 
+#port_offset = [[-0.082, 0.069]]
+port_offset = [[-0.080, 0.069]]
+
 class state(Enum):
     INITIALIZE = 0
     MOVE_POS = 1
@@ -53,7 +54,8 @@ class camera_thread(threading.Thread):
         # paramaters
         self.isVisual = isVisual
         self.activeDetect = False
-        self.offset = 0
+        self.offset_H = 0
+        self.offset_V = 0
 
         # retur values
         self.qrCodeX = None
@@ -67,8 +69,11 @@ class camera_thread(threading.Thread):
     def set_detect_ref_img(self, id):
         self.detect.setRefImg(imgId = id)
 
-    def set_offset(self, num):
-        self.offset = int(num)
+    def set_H_offset(self, num):
+        self.offset_H = int(num)
+
+    def set_V_offset(self, num):
+        self.offset_V = int(num)
 
     def get_qrCenter(self):
         thread_lock.acquire()
@@ -99,10 +104,14 @@ class camera_thread(threading.Thread):
                 self.qrCodeX, self.qrCodeY, self.theta = self.detect.findQRcode(frame)
                 thread_lock.release() 
                 if self.qrCodeX != None and self.qrCodeY != None:  
+                    # QR code center red point
                     cv2.circle(frame, (self.qrCodeX, self.qrCodeY), 3, (0, 0, 255), -1)
-                    cv2.circle(frame, (self.qrCodeX + self.offset, self.qrCodeY), 3, (255, 0, 0), -1)
-                    cv2.circle(frame, (self.qrCodeX - self.offset, self.qrCodeY), 3, (255, 0, 0), -1)  
-                    cv2.circle(frame, (self.qrCodeX, self.qrCodeY + 2 * self.offset), 3, (255, 0, 0), -1)                    
+                    # left and right refference points for roll angle
+                    cv2.circle(frame, (self.qrCodeX + self.offset_H, self.qrCodeY), 3, (255, 0, 0), -1)                    
+                    cv2.circle(frame, (self.qrCodeX - self.offset_H, self.qrCodeY), 3, (255, 0, 0), -1)  
+                    # up and down refference points for pitch angle
+                    cv2.circle(frame, (self.qrCodeX, self.qrCodeY -  self.offset_V), 3, (0, 255, 0), -1)
+                    cv2.circle(frame, (self.qrCodeX, self.qrCodeY +  self.offset_V), 3, (0, 255, 0), -1)                    
             
             if self.isVisual == True:
                 cv2.imshow('Vision', frame)
@@ -110,7 +119,7 @@ class camera_thread(threading.Thread):
             
 
 class armControl:
-    def __init__(self, isVisual = True, offset = 50):
+    def __init__(self, isVisual = True, offset_H = 50, offset_V = 50):
         #camera thread
         self.camThread = camera_thread(isVisual)
         
@@ -132,7 +141,8 @@ class armControl:
         self.qrCodeId = 0
 
         #parameter for target QR code
-        self.offset = offset
+        self.offset_H = offset_H
+        self.offset_V = offset_V
 
     def get_QRcenter(self):
         qrX = None
@@ -154,7 +164,7 @@ class armControl:
         angleSpeed = 20 # degree/s  
         lineSpeed_norm = 20 # mm/s  
         lineSpeed_slow = 10 # mm/s
-        alignDistance = 200 # mm
+        alignDistance = 250 # mm
 
         sampleLen = 20
         sampleLenLong = 40
@@ -194,7 +204,8 @@ class armControl:
                 if self.state_machine[2] == True:
                     self.camThread.set_detect_ref_img(self.qrCodeId)
                     self.camThread.set_detect(True)
-                    self.camThread.set_offset(self.offset)
+                    self.camThread.set_H_offset(self.offset_H)
+                    self.camThread.set_V_offset(self.offset_V)
                     armState = state.ROLL_CENTER    
 
             elif armState == state.ROLL_CENTER:
@@ -265,8 +276,8 @@ class armControl:
                         rMeasure = 0.0
                         lMeasure = 0.0
                         while rMeasure < 0.1 or lMeasure < 0.1:
-                            rMeasure = self.camThread.cam.getCoordinate(qrX + self.offset, qrY)[2]
-                            lMeasure = self.camThread.cam.getCoordinate(qrX - self.offset, qrY)[2]                        
+                            rMeasure = self.camThread.cam.getCoordinate(qrX + self.offset_H, qrY)[2]
+                            lMeasure = self.camThread.cam.getCoordinate(qrX - self.offset_H, qrY)[2]                        
                         refRpos += rMeasure
                         refLpos += lMeasure
                     
@@ -300,8 +311,8 @@ class armControl:
                         downMeasure = 0.0
                         
                         while upMeasure < 0.1 or downMeasure < 0.1:
-                            upMeasure = self.camThread.cam.getCoordinate(qrX, qrY)[2]
-                            downMeasure = self.camThread.cam.getCoordinate(qrX, qrY + 2 * self.offset)[2]                        
+                            upMeasure = self.camThread.cam.getCoordinate(qrX, qrY - self.offset_V)[2]
+                            downMeasure = self.camThread.cam.getCoordinate(qrX, qrY + self.offset_V)[2]                        
                         upPos += upMeasure
                         downPos += downMeasure
                     
@@ -402,7 +413,7 @@ class armControl:
 
 if __name__ == "__main__":
     #parameters
-    offset_parameter = 70
+    offset_parameter = 60
 
-    xarm6 = armControl(isVisual = True, offset = offset_parameter)
+    xarm6 = armControl(isVisual = True, offset_H = 70, offset_V = 70)
     xarm6.run()

@@ -30,8 +30,7 @@ xarm_pkg = os.path.join(os.path.dirname(__file__), 'tools/xArm-Python-SDK')
 sys.path.append(xarm_pkg)
 from xarm.wrapper import XArmAPI
 
-#port_offset = [[-0.082, 0.069]]
-port_offset = [[-0.080, 0.069]]
+port_offset = [[-0.080, 0.070]]  # this parameters was set on 26 Jun
 
 class state(Enum):
     INITIALIZE = 0
@@ -164,6 +163,7 @@ class armControl:
         angleSpeed = 20 # degree/s  
         lineSpeed_norm = 20 # mm/s  
         lineSpeed_slow = 10 # mm/s
+        defaultDist = 350 # mm
         alignDistance = 250 # mm
 
         sampleLen = 20
@@ -171,7 +171,7 @@ class armControl:
         # following parameter for make tool paraller to port
         roll_thr  = 0.6 # tool parallel to charging port
         pitch_thr = 0.6
-        step_factor = 3.5
+        step_factor = 4
         roll_speed = 2
 
         # following parameter for make tool paraller to port
@@ -252,10 +252,19 @@ class armControl:
 
             elif armState == state.DEFAULT_CHARGE_POS and self.state_machine[2] == False:           
                 self.arm.set_servo_angle(angle=[0, 0, 0, 0, -90, 0], relative = True, speed=angleSpeed, wait=False)
-                self.arm.set_tool_position(z = 25, speed=lineSpeed_norm, is_radian=False, wait=True)             
+                self.arm.set_tool_position(z = 10, speed=lineSpeed_norm, is_radian=False, wait=True)             
                 self.state_machine[2] = True
 
             elif armState == state.ROLL_CENTER and self.state_machine[3] == False:
+                '''
+                Move to default detect position
+                '''                
+                qrX, qrY = self.get_QRcenter()
+                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                dist = centPos[2] * 1000 - defaultDist
+                if dist > 0.0:
+                    print("[+] Move to default detect distance {} mm".format(defaultDist))
+                    self.arm.set_tool_position(z = centPos[2] * 1000 - defaultDist, speed = lineSpeed_norm, wait = True)
                 '''
                 use while loop to make sure get something
                 1000 is to transfor m to mm
@@ -415,5 +424,5 @@ if __name__ == "__main__":
     #parameters
     offset_parameter = 60
 
-    xarm6 = armControl(isVisual = True, offset_H = 70, offset_V = 70)
+    xarm6 = armControl(isVisual = True, offset_H = 70, offset_V = 80)
     xarm6.run()

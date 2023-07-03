@@ -166,8 +166,8 @@ class armControl:
         defaultDist = 350 # mm
         alignDistance = 250 # mm
 
-        sampleLen = 30
-        sampleLenLong = 50
+        sampleLen = 40
+        sampleLenLong = 60
         # following parameter for make tool paraller to port
         roll_thr  = 0.5 # tool parallel to charging port
         pitch_thr = 0.5
@@ -508,7 +508,7 @@ class armControl:
                 self.state_machine[5] = True  
 
             elif armState == state.CHARGING and self.state_machine[6] == False: 
-                print("[+] Charging")
+                print("[+] Charging Demo Mode: Wait 5 Secs")
                 time.sleep(5)
                 self.state_machine[6] = True 
         

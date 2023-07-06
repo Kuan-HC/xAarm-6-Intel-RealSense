@@ -147,7 +147,6 @@ class armControl:
         qrX = None
         qrY = None
         while qrX == None or qrY == None:
-            #self.arm.set_tool_position(z= -2, speed=lineSpeed, is_radian=False, wait=True)
             qrX, qrY = self.camThread.get_qrCenter()
         
         return qrX, qrY
@@ -169,8 +168,8 @@ class armControl:
         sampleLen = 40
         sampleLenLong = 60
         # following parameter for make tool paraller to port
-        roll_thr  = 0.5 # tool parallel to charging port
-        pitch_thr = 0.5
+        roll_thr  = 1.0 # tool parallel to charging port
+        pitch_thr = 1.0
         roll_speed = 2
 
         # following parameter for make tool paraller to port

@@ -30,8 +30,13 @@ xarm_pkg = os.path.join(os.path.dirname(__file__), 'tools/xArm-Python-SDK')
 sys.path.append(xarm_pkg)
 from xarm.wrapper import XArmAPI
 
-port_offset = [[-0.081, 0.068]]  # 往右-〉[1]負值變大
+# Final insert position regards to qr code center
+port_offset = [[-0.081, 0.069]]  # 若要向右移動-〉負值變大 e.g. -0.081 -> -0.085
 
+
+'''
+定義state machine
+'''
 class state(Enum):
     INITIALIZE = 0
     MOVE_POS = 1
@@ -50,6 +55,7 @@ class camera_thread(threading.Thread):
         
         self.cam = realSenseCamera()  #Intel realsense camera
         self.detect = qrCodeDetect()  #QR code detector
+        
         # paramaters
         self.isVisual = isVisual
         self.activeDetect = False
@@ -105,10 +111,10 @@ class camera_thread(threading.Thread):
                 if self.qrCodeX != None and self.qrCodeY != None:  
                     # QR code center red point
                     cv2.circle(frame, (self.qrCodeX, self.qrCodeY), 3, (0, 0, 255), -1)
-                    # left and right refference points for roll angle
+                    # left and right refference points for roll angle，color: blue
                     cv2.circle(frame, (self.qrCodeX + self.offset_H, self.qrCodeY), 3, (255, 0, 0), -1)                    
                     cv2.circle(frame, (self.qrCodeX - self.offset_H, self.qrCodeY), 3, (255, 0, 0), -1)  
-                    # up and down refference points for pitch angle
+                    # up and down refference points for pitch angle，color: green
                     cv2.circle(frame, (self.qrCodeX, self.qrCodeY -  self.offset_V), 3, (0, 255, 0), -1)
                     cv2.circle(frame, (self.qrCodeX, self.qrCodeY +  self.offset_V), 3, (0, 255, 0), -1)                    
             
@@ -118,9 +124,12 @@ class camera_thread(threading.Thread):
             
 
 class armControl:
-    def __init__(self, isVisual = True, offset_H = 50, offset_V = 50):
+    def __init__(self, isDemo = True, isVisual = True, offset_H = 50, offset_V = 50):
         #camera thread
         self.camThread = camera_thread(isVisual)
+
+        #Demo mode will prepeadly erform plug action
+        self.isDemo = isDemo
         
         #connect xarm6 
         self.arm = XArmAPI('192.168.1.221')  # AC power supply IP
@@ -131,7 +140,7 @@ class armControl:
         self.arm.set_self_collision_detection(1)   
         self.depth_stat_pos = 0 #position before insert charging gun
 
-        # state machine states
+        # state machine states, when one state is completted, the corresponding state shall switch to True
         self.state_machine = [False, False, False, False, False, False, False, False]        
 
         #parameter get from ros communication
@@ -164,20 +173,22 @@ class armControl:
         lineSpeed_slow = 10 # mm/s
         defaultDist = 350 # mm
         alignDistance = 250 # mm
-
+        
+        # roll and pitch will take 40 measurement, because intel realsens sense need longer
+        # yaw take 60 
         sampleLen = 40
         sampleLenLong = 60
+
         # following parameter for make tool paraller to port
-        roll_thr  = 1.0 # tool parallel to charging port
-        pitch_thr = 1.0
-        roll_speed = 2
+        roll_thr  = 0.6 # tool parallel to charging port
+        pitch_thr = 0.6
+        angle_speed = 3
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
         yaw_step_factor = 1
         yaw_speed = 3
         
-
         #state.YAW_CHARGE_POS parameters
         dist_thr = 0.8
 
@@ -188,7 +199,7 @@ class armControl:
         while True:
             '''
             state machine first part
-            state changes
+            when state can changes
             '''
             if armState == state.INITIALIZE:
                 if self.state_machine[0] == True and self.action == True:
@@ -197,6 +208,7 @@ class armControl:
             elif armState == state.MOVE_POS:
                 if self.state_machine[1] == True and self.mobile_on_spot == True:
                     armState = state.DEFAULT_CHARGE_POS
+                    time.sleep(0.5)
 
             elif armState == state.DEFAULT_CHARGE_POS:
                 if self.state_machine[2] == True:
@@ -205,6 +217,7 @@ class armControl:
                     self.camThread.set_H_offset(self.offset_H)
                     self.camThread.set_V_offset(self.offset_V)
                     armState = state.ROLL_CENTER    
+                    time.sleep(0.5)
 
             elif armState == state.ROLL_CENTER:
                 if self.state_machine[3] == True:
@@ -232,25 +245,30 @@ class armControl:
                     self.arm.set_state(state=0)
                     self.arm.set_self_collision_detection(1)
                     armState = state.MOVE_POS
-                    self.state_machine[1] = False
-                    self.mobile_on_spot = False
-
-
+                    self.state_machine = [True, False, False, False, False, False, False, False]
+                    if self.isDemo != True:
+                        self.mobile_on_spot = False
+                    
+                    time.sleep(1.0)
+                    
             '''
-            state machine first part
+            state machine second part
             state action
             '''
             if armState == state.INITIALIZE and self.state_machine[0] == False:
                 self.arm.reset(speed=angleSpeed, wait=True)
+                self.arm.set_servo_angle(angle=[0, -30, 0, 0, 30, 0], speed=angleSpeed, wait=True)
                 self.state_machine[0] = True
 
-            elif armState == state.MOVE_POS and self.state_machine[1] == False:
-                self.arm.set_servo_angle(angle=[30, -30, 0, 0, 30, 0], speed=angleSpeed, wait=True)    
-                self.state_machine[1] = True   
+            elif armState == state.MOVE_POS and self.state_machine[1] == False:                  
+                self.arm.set_servo_angle(angle=[30, -30, 0, 0, 30, 0], speed=angleSpeed, wait=True)   
+                print("[+] Arm in move position")
+                self.state_machine[1] = True  
 
             elif armState == state.DEFAULT_CHARGE_POS and self.state_machine[2] == False:           
-                self.arm.set_servo_angle(angle=[0, 0, 0, 0, -90, 0], relative = True, speed=angleSpeed, wait=False)
-                self.arm.set_tool_position(z = 10, speed=lineSpeed_norm, is_radian=False, wait=True)             
+                self.arm.set_servo_angle(angle=[0, 0, 0, 0, -90, 0], relative = True, speed=angleSpeed, wait=True)
+                self.arm.set_tool_position(z = 10, speed=lineSpeed_norm, is_radian=False, wait=True)   
+                print("[+] Arm in default charging position")          
                 self.state_machine[2] = True
 
             elif armState == state.ROLL_CENTER and self.state_machine[3] == False:
@@ -259,11 +277,14 @@ class armControl:
                 1000 is to transfor m to mm
                 '''                
                 qrX, qrY = self.get_QRcenter()
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+                centPos = np.array([.0, .0, .0])
+                while centPos[2] < 0.1:
+                    centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+
                 dist = centPos[2] * 1000 - defaultDist
                 if dist > 0.0:
                     print("[+] Move to default detect distance {} mm".format(defaultDist))
-                    self.arm.set_tool_position(z = centPos[2] * 1000 - defaultDist, speed = lineSpeed_norm, wait = True)
+                    self.arm.set_tool_position(z = dist, speed = lineSpeed_norm, wait = True)
 
                 '''
                 Calculate roll angle
@@ -273,13 +294,13 @@ class armControl:
                 centPos = self.camThread.cam.getCoordinate(qrX, qrY)
                 self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
 
-                # Calculate angle
+                # Calculate roll angle
                 print("[+] Roll angle")    
                 while True:
                     qrX, qrY = self.get_QRcenter()
                     refRpos = np.array([.0, .0, .0])
                     refLpos = np.array([.0, .0, .0])
-                    #For debug
+                    # For debug
                     # print("[+] Debug Info")
                     # print("    QR  code center:{}".format(self.camThread.cam.getCoordinate(qrX, qrY)))
                     # print("    Left  ref point:{}".format(self.camThread.cam.getCoordinate(qrX - self.offset_H, qrY)))
@@ -313,46 +334,10 @@ class armControl:
                         factor = 2
                     step = round((error / factor), 1)
 
-                    print("    error degree:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
-                    self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
+                    print("    error degree:{:.5}, step:{:.2}, speed:{}".format(error, step, angle_speed))                 
+                    self.arm.set_tool_position(roll = step, speed = angle_speed, is_radian=False, wait=True)                    
                     time.sleep(0.25)
                 
-                
-                '''                
-                # PID Roll angle control
-                print("[+] Roll angle")     
-                time.sleep(2.0)            
-                while True:
-                    qrX, qrY = self.get_QRcenter()
-                    refRpos = 0.0
-                    refLpos = 0.0
-                    #For debug
-                    print("[+] Debug Info")
-                    print("    QR  code center:{}".format(self.camThread.cam.getCoordinate(qrX, qrY)))
-                    print("    Left  ref point:{}".format(self.camThread.cam.getCoordinate(qrX - self.offset_H, qrY)))
-                    print("    Right ref point:{}".format(self.camThread.cam.getCoordinate(qrX + self.offset_H, qrY)))
-                    
-                    for i in range(sampleLen):
-                        rMeasure = 0.0
-                        lMeasure = 0.0
-                        while rMeasure < 0.1 or lMeasure < 0.1:
-                            rMeasure = self.camThread.cam.getCoordinate(qrX - self.offset_H, qrY)[2]
-                            lMeasure = self.camThread.cam.getCoordinate(qrX + self.offset_H, qrY)[2]                        
-                        refRpos += rMeasure
-                        refLpos += lMeasure
-                    
-                    refRpos /= sampleLen
-                    refLpos /= sampleLen                                       
-                    error = refLpos * 1000 - refRpos * 1000               
-                    if abs(error) < roll_thr:
-                        print("    error:{:.5}".format(error))
-                        break
-
-                    step = round((error / step_factor), 1)
-                    print("    error:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
-                    self.arm.set_tool_position(roll = step, speed = roll_speed, is_radian=False, wait=True)                    
-                    time.sleep(0.25)   
-                '''
 
                 print("[+] QR center to image center")
                 qrX, qrY = self.get_QRcenter()
@@ -401,47 +386,10 @@ class armControl:
                         factor = 2
                     step = round((error / factor), 1)
 
-                    print("    error degree:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
-                    self.arm.set_tool_position(pitch = step, speed = roll_speed, is_radian=False, wait=True)                    
+                    print("    error degree:{:.5}, step:{:.2}, speed:{}".format(error, step, angle_speed))                 
+                    self.arm.set_tool_position(pitch = step, speed = angle_speed, is_radian=False, wait=True)                    
                     time.sleep(0.25)
 
-
-                '''
-                # PID Pitch angle control
-                print("[+] Pitch angle")    
-                time.sleep(2.0)            
-                while True:
-                    qrX, qrY = self.get_QRcenter()
-                    upPos = 0.0
-                    downPos = 0.0
-                    #For debug
-                    print("[+] Debug Info")
-                    print("    QR  code center:{}".format(self.camThread.cam.getCoordinate(qrX, qrY)))
-                    print("    Up   ref  point:{}".format(self.camThread.cam.getCoordinate(qrX, qrY - self.offset_V)))
-                    print("    Down ref  point:{}".format(self.camThread.cam.getCoordinate(qrX, qrY + self.offset_V)))
-                    
-                    for i in range(sampleLenLong):
-                        upMeasure = 0.0
-                        downMeasure = 0.0
-                        
-                        while upMeasure < 0.1 or downMeasure < 0.1:
-                            upMeasure = self.camThread.cam.getCoordinate(qrX, qrY - self.offset_V)[2]
-                            downMeasure = self.camThread.cam.getCoordinate(qrX, qrY + self.offset_V)[2]                        
-                        upPos += upMeasure
-                        downPos += downMeasure
-                    
-                    upPos /= sampleLenLong
-                    downPos /= sampleLenLong                                       
-                    error = downPos * 1000 - upPos * 1000               
-                    if abs(error) < pitch_thr:
-                        print("    error:{:.5}".format(error))
-                        break
-
-                    step = round((error / step_factor), 1)
-                    print("    error:{:.5}, step:{:.2}, speed:{}".format(error, step, roll_speed))                 
-                    self.arm.set_tool_position(pitch = step, speed = roll_speed, is_radian=False, wait=True)                    
-                    time.sleep(0.25)      
-                '''
 
                 print("[+] Move forward to {} mm".format(alignDistance))
                 qrX, qrY = self.get_QRcenter()
@@ -513,7 +461,7 @@ class armControl:
         
             elif armState == state.DISENGAGE and self.state_machine[7] == False: 
                 print("[+] Disengage")
-                movement += 50 #offset 10mm 
+                movement += 20 #offset 20mm 
                 while movement > 0.0:
                     self.arm.set_servo_cartesian_aa([0, 0, -lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
                     movement -= lastPhaseStep
@@ -530,5 +478,5 @@ if __name__ == "__main__":
     #parameters
     offset_parameter = 60
 
-    xarm6 = armControl(isVisual = True, offset_H = 70, offset_V = 80)
+    xarm6 = armControl(isDemo = True, isVisual = True, offset_H = 95, offset_V = 80)
     xarm6.run()

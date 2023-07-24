@@ -24,6 +24,9 @@ class qrCodeDetect:
         imgPath = "./ref_images/" + str(imgId) + ".jpg" 
         refImg = cv2.imread(imgPath, cv2.IMREAD_GRAYSCALE) 
         self.refImg = self.re_size_photo(refImg, 4) 
+        '''
+        creat reference image detrector and descriptor
+        '''
         self.kp_image, self.desc_image = self.sift.detectAndCompute(self.refImg, None)
 
     def get_angle(self, rPos, lPos, real_rpos, real_lpos):
@@ -46,17 +49,9 @@ class qrCodeDetect:
 
     def findQRcode(self,rgbImage):
         '''
-        creat reference image detrector and descriptor
-        '''
-        #kp_image, desc_image = self.sift.detectAndCompute(self.refImg, None)
-
-        '''
         creat input image detrector and descriptor
         '''
-        
         kp_grayframe, desc_grayframe = self.sift.detectAndCompute(rgbImage, None)
-
-        #matches = self.flann.knnMatch(self.desc_image, desc_grayframe, k=2)
         matches = self.bfMatcher.knnMatch(self.desc_image, desc_grayframe, k=2)
         good_points = []
 

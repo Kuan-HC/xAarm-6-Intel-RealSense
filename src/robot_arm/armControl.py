@@ -193,8 +193,12 @@ class armControl:
         dist_thr = 0.8
 
         # last insert phase each step distance
-        lastPhaseStep = 0.15
+        plugStep = 0.1
+        unplugStep = 0.2
         movement = 0.0 #total movement in insert phase
+
+        # counter how many times completed
+        cnt = 0
 
         while True:
             '''
@@ -248,6 +252,10 @@ class armControl:
                     self.state_machine = [True, False, False, False, False, False, False, False]
                     if self.isDemo != True:
                         self.mobile_on_spot = False
+
+                    # show how many cycles has performed
+                    cnt += 1
+                    print("[+] Total {} cycles completed".format(cnt))
                     
                     time.sleep(1.0)
                     
@@ -426,8 +434,8 @@ class armControl:
                 time.sleep(1)
                 toolDigInput_1 = False
                 while toolDigInput_1 == False:
-                    self.arm.set_servo_cartesian_aa([0, 0, lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
-                    movement += lastPhaseStep
+                    self.arm.set_servo_cartesian_aa([0, 0, plugStep, 0, 0, 0], is_tool_coord=True, wait=False)
+                    movement += plugStep
                     time.sleep(0.01)
 
                     _, digitals = self.arm.get_tgpio_digital()
@@ -445,8 +453,8 @@ class armControl:
                 print("[+] Disengage")
                 movement += 20 #offset 20mm 
                 while movement > 0.0:
-                    self.arm.set_servo_cartesian_aa([0, 0, -lastPhaseStep, 0, 0, 0], is_tool_coord=True, wait=False)
-                    movement -= lastPhaseStep
+                    self.arm.set_servo_cartesian_aa([0, 0, -unplugStep, 0, 0, 0], is_tool_coord=True, wait=False)
+                    movement -= unplugStep
                     time.sleep(0.01)
 
                 time.sleep(2)
@@ -459,5 +467,5 @@ if __name__ == "__main__":
     #parameters
     offset_parameter = 60
 
-    xarm6 = armControl(isDemo = True, isVisual = True, offset_H = 110, offset_V = 120)
+    xarm6 = armControl(isDemo = True, isVisual = True, offset_H = 115, offset_V = 120)
     xarm6.run()

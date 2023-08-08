@@ -137,8 +137,7 @@ class armControl:
         self.arm.set_mode(0)
         self.arm.set_state(state=0)
         self.arm.clean_error()
-        self.arm.set_self_collision_detection(1)   
-        self.depth_stat_pos = 0 #position before insert charging gun
+        self.arm.set_collision_sensitivity(0)        
 
         # state machine states, when one state is completted, the corresponding state shall switch to True
         self.state_machine = [False, False, False, False, False, False, False, False]        
@@ -151,6 +150,8 @@ class armControl:
         #parameter for target QR code
         self.offset_H = offset_H
         self.offset_V = offset_V
+
+        time.sleep(0.5)
 
     def get_QRcenter(self):
         qrX = None
@@ -193,8 +194,8 @@ class armControl:
         dist_thr = 0.8
 
         # last insert phase each step distance
-        plugStep = 0.1
-        unplugStep = 0.2
+        plugStep = 0.15
+        unplugStep = 0.3
         movement = 0.0 #total movement in insert phase
 
         # counter how many times completed
@@ -229,11 +230,11 @@ class armControl:
 
             elif armState == state.YAW_CHARGE_POS:
                 if self.state_machine[4] == True:
-                    armState = state.PLUG   
+                    armState = state.PLUG    
                     self.arm.set_mode(1)
-                    self.arm.set_state(state=0) 
-                    self.arm.set_self_collision_detection(0)   
+                    self.arm.set_state(state=0)                       
                     self.camThread.set_detect(False)
+                    time.sleep(0.5)
 
             elif armState == state.PLUG:  
                 if self.state_machine[5] == True:
@@ -247,7 +248,7 @@ class armControl:
                 if self.state_machine[7] == True:
                     self.arm.set_mode(0)
                     self.arm.set_state(state=0)
-                    self.arm.set_self_collision_detection(1)
+                    time.sleep(0.5)
                     armState = state.MOVE_POS
                     self.state_machine = [True, False, False, False, False, False, False, False]
                     if self.isDemo != True:
@@ -255,10 +256,8 @@ class armControl:
 
                     # show how many cycles has performed
                     cnt += 1
-                    print("[+] Total {} cycles completed".format(cnt))
-                    
-                    time.sleep(1.0)
-                    
+                    print("[+] Total {} cycles completed\n".format(cnt))
+                     
             '''
             state machine second part
             state action

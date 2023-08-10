@@ -31,7 +31,7 @@ sys.path.append(xarm_pkg)
 from xarm.wrapper import XArmAPI
 
 # Final insert position regards to qr code center
-port_offset = [[-0.081, 0.069]]  # 若要向右移動-〉負值變大 e.g. -0.081 -> -0.085
+port_offset = [[-0.08036, 0.0699]]  # 若要向右移動-〉負值變大 e.g. -0.081 -> -0.085
 
 
 '''
@@ -183,7 +183,7 @@ class armControl:
         # following parameter for make tool paraller to port
         roll_thr  = 0.6 # tool parallel to charging port
         pitch_thr = 0.6
-        angle_speed = 3
+        angle_speed = 5
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port
@@ -274,7 +274,7 @@ class armControl:
 
             elif armState == state.DEFAULT_CHARGE_POS and self.state_machine[2] == False:           
                 self.arm.set_servo_angle(angle=[0, 0, 0, 0, -90, 0], relative = True, speed=angleSpeed, wait=True)
-                self.arm.set_tool_position(z = 10, speed=lineSpeed_norm, is_radian=False, wait=True)   
+                self.arm.set_tool_position(z = 10, speed=lineSpeed_slow, is_radian=False, wait=True)   
                 print("[+] Arm in default charging position")          
                 self.state_machine[2] = True
 
@@ -301,7 +301,7 @@ class armControl:
                 centPos = np.array([.0, .0, .0])
                 while centPos[2] < 0.1:
                     centPos = self.camThread.cam.getCoordinate(qrX, qrY)                
-                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)  
+                self.arm.set_tool_position(x = -1000 * centPos[1], y = 1000 * centPos[0], speed = lineSpeed_norm, is_radian=False, wait=True)  
 
                 # Calculate roll angle
                 print("[+] Roll angle")    
@@ -342,7 +342,7 @@ class armControl:
                 centPos = np.array([.0, .0, .0])
                 while centPos[2] < 0.1:
                     centPos = self.camThread.cam.getCoordinate(qrX, qrY)
-                self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_slow, is_radian=False, wait=True)
+                self.arm.set_tool_position(y = 1000 * centPos[0], speed = lineSpeed_norm, is_radian=False, wait=True)
 
                 # Calculate angle
                 print("[+] Pitch angle")    
@@ -352,7 +352,7 @@ class armControl:
                     upPos = np.array([.0, .0, .0])
                     downPos = np.array([.0, .0, .0])
                                         
-                    for i in range(sampleLenLong):
+                    for i in range(sampleLen):
                         upMeasure = np.array([.0, .0, .0])
                         downMeasure = np.array([.0, .0, .0])
                         
@@ -464,7 +464,6 @@ class armControl:
 
 if __name__ == "__main__":
     #parameters
-    offset_parameter = 60
 
     xarm6 = armControl(isDemo = True, isVisual = True, offset_H = 115, offset_V = 120)
     xarm6.run()

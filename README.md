@@ -1,6 +1,7 @@
 # xAarm 6 & Intel RealSense
 
-<img src="Xarm_Realsense.gif" width = "600">
+<img src="Xarm_Realsense.gif" width = "500">
+<img src="timelapse.gif" width = "500">
 
 <b>OS</b>: Ubuntu 22.04 LTS  
 

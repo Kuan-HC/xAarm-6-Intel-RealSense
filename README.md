@@ -11,7 +11,7 @@ Intel RealSense D435i
 
 ## Dependencies
 
-* <b> OpenCv 4.7.0</b>
+* <b> OpenCv 4.7.0</b>  
     [Link](https://www.samontab.com/web/2023/02/installing-opencv-4-7-0-in-ubuntu-22-04-lts/)
 * <b> Intel RealSense  </b>  
     Installation Guide:  

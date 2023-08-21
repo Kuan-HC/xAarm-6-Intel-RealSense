@@ -354,11 +354,11 @@ class armControl:
                                         
                     for i in range(sampleLen):
                         upMeasure = np.array([.0, .0, .0])
-                        downMeasure = np.array([.0, .0, .0])
-                        
+                        downMeasure = np.array([.0, .0, .0])                        
                         while upMeasure[2] < 0.1 or downMeasure[2] < 0.1:
                             upMeasure = self.camThread.cam.getCoordinate(qrX, qrY - self.offset_V)
-                            downMeasure = self.camThread.cam.getCoordinate(qrX, qrY + self.offset_V)                      
+                            downMeasure = self.camThread.cam.getCoordinate(qrX, qrY + self.offset_V)     
+
                         upPos += upMeasure
                         downPos += downMeasure
                     
@@ -382,7 +382,11 @@ class armControl:
 
                 print("[+] Move forward to {} mm".format(alignDistance))
                 qrX, qrY = self.get_QRcenter()
-                centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+
+                centPos = np.array([.0, .0, .0])
+                while centPos[2] < 0.1:
+                    centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+
                 self.arm.set_tool_position(z = centPos[2] * 1000 - alignDistance, speed = lineSpeed_norm, wait = True)
                 self.state_machine[3] = True        
 
@@ -409,7 +413,11 @@ class armControl:
                 while True:
                     time.sleep(1)
                     qrX, qrY = self.get_QRcenter()
-                    centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+
+                    centPos = np.array([.0, .0, .0])
+                    while centPos[2] < 0.1:
+                        centPos = self.camThread.cam.getCoordinate(qrX, qrY)
+
                     if abs(centPos[2] - 0.0) < 1E-6:
                         continue
 

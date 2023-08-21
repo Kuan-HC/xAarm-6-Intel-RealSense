@@ -183,7 +183,7 @@ class armControl:
         # following parameter for make tool paraller to port
         roll_thr  = 0.6 # tool parallel to charging port
         pitch_thr = 0.6
-        angle_speed = 5
+        angle_speed = 3
 
         # following parameter for make tool paraller to port
         yaw_thr  = 0.6 # tool parallel to charging port

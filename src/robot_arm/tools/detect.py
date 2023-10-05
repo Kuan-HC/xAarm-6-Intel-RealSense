@@ -23,7 +23,7 @@ class qrCodeDetect:
     def setRefImg(self, imgId = 0):
         imgPath = "./ref_images/" + str(imgId) + ".jpg" 
         refImg = cv2.imread(imgPath, cv2.IMREAD_GRAYSCALE) 
-        self.refImg = self.re_size_photo(refImg, 4) 
+        self.refImg = self.re_size_photo(refImg, 3) 
         '''
         creat reference image detrector and descriptor
         '''

@@ -42,6 +42,16 @@ class realSenseCamera:
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
+
+        preset_range = depth_sensor.get_option_range(rs.option.visual_preset)
+        # print('preset range:'+str(preset_range))_
+        for i in range(int(preset_range.max)):
+            visulpreset = depth_sensor.get_option_value_description(rs.option.visual_preset,i)
+            print('%02d: %s' %(i,visulpreset))
+            if visulpreset == "High Accuracy":
+                depth_sensor.set_option(rs.option.visual_preset, i)
+                print("Set depth camera to  High Accuracy")
+        
         self.depth_scale = depth_sensor.get_depth_scale()
 
         # Create an align object
@@ -71,21 +81,18 @@ class realSenseCamera:
         return aligned_depth_frame, aligned_color_frame
     
     def getColorImage(self):
-        depth_frame = None
         color_frame = None
 
-        while depth_frame is None or color_frame is None:
-            depth_frame, color_frame = self.getAlignedFrames()
+        while  color_frame is None:
+            _, color_frame = self.getAlignedFrames()
 
         return np.asanyarray(color_frame.get_data())
     
     def getDistance(self, x, y):
         depth_frame = None
-        color_frame = None
 
-        while depth_frame is None or color_frame is None:
-
-            depth_frame, color_frame = self.getAlignedFrames()
+        while depth_frame is None:
+            depth_frame, _ = self.getAlignedFrames()
 
         return depth_frame.get_distance(x, y)
     
